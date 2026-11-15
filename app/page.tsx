@@ -30,7 +30,7 @@ export default function Home() {
       .order("created_at", { ascending: false });
 
     if (error) {
-      setMessage("خطا در دریافت کانفیگ‌ها");
+      setMessage("خطا در دریافت کانفیگ‌ها: " + error.message);
       return;
     }
 
@@ -89,14 +89,12 @@ export default function Home() {
 
     setLoading(true);
 
-    const { error } = await supabase.from("vpn_configs").insert([
-      {
-        name: name.trim(),
-        type,
-        config: config.trim(),
-        active: true,
-      },
-    ]);
+    const { error } = await supabase.from("vpn_configs").insert({
+      name: name.trim(),
+      type,
+      config: config.trim(),
+      active: true,
+    });
 
     setLoading(false);
 
@@ -135,7 +133,7 @@ export default function Home() {
       .eq("id", id);
 
     if (error) {
-      setMessage("خطا در حذف کانفیگ: " + error.message);
+      setMessage("خطا در حذف: " + error.message);
       return;
     }
 
@@ -225,7 +223,9 @@ export default function Home() {
 
             <h3>همه کانفیگ‌ها</h3>
 
-            {configs.length === 0 && <p>هنوز کانفیگی ثبت نشده است.</p>}
+            {configs.length === 0 && (
+              <p>هنوز کانفیگی ثبت نشده است.</p>
+            )}
 
             {configs.map((item) => (
               <div className="config-card" key={item.id}>
@@ -235,13 +235,17 @@ export default function Home() {
                   وضعیت: {item.active ? "فعال" : "غیرفعال"}
                 </p>
 
-                <button onClick={() => toggleConfig(item)}>
+                <button
+                  onClick={() => toggleConfig(item)}
+                  disabled={loading}
+                >
                   {item.active ? "غیرفعال کردن" : "فعال کردن"}
                 </button>
 
                 <button
                   className="danger"
                   onClick={() => deleteConfig(item.id)}
+                  disabled={loading}
                 >
                   حذف
                 </button>
@@ -261,6 +265,7 @@ export default function Home() {
             <div className="config-card" key={item.id}>
               <h3>{item.name}</h3>
               <p>نوع: {item.type}</p>
+
               <button onClick={() => copyConfig(item.config)}>
                 کپی کانفیگ
               </button>

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -23,13 +24,17 @@ export default function Home() {
   const [message, setMessage] = useState("");
 
   async function loadConfigs() {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("vpn_configs")
       .select("*")
-      .eq("active", true)
       .order("created_at", { ascending: false });
 
-    setConfigs(data || []);
+    if (error) {
+      setMessage(error.message);
+    } else {
+      setConfigs(data || []);
+    }
+
     setLoading(false);
   }
 
@@ -38,10 +43,14 @@ export default function Home() {
 
     supabase.auth.getSession().then(({ data }) => {
       setLoggedIn(!!data.session);
+      loadConfigs();
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, session) => setLoggedIn(!!session)
+      (_event, session) => {
+        setLoggedIn(!!session);
+        loadConfigs();
+      }
     );
 
     return () => listener.subscription.unsubscribe();
@@ -52,12 +61,19 @@ export default function Home() {
       email,
       password,
     });
+
     setMessage(error ? error.message : "وارد شدی");
+    if (!error) {
+      setLoggedIn(true);
+      await loadConfigs();
+    }
   }
 
   async function logout() {
     await supabase.auth.signOut();
+    setLoggedIn(false);
     setMessage("خارج شدی");
+    await loadConfigs();
   }
 
   async function addConfig() {
@@ -79,7 +95,25 @@ export default function Home() {
       setName("");
       setConfig("");
       setMessage("کانفیگ اضافه شد");
-      loadConfigs();
+      await loadConfigs();
+    }
+  }
+
+  async function toggleConfig(item: VPNConfig) {
+    const { error } = await supabase
+      .from("vpn_configs")
+      .update({ active: !item.active })
+      .eq("id", item.id);
+
+    if (error) {
+      setMessage(error.message);
+    } else {
+      setMessage(
+        item.active
+          ? "کانفیگ غیرفعال شد"
+          : "کانفیگ دوباره فعال شد"
+      );
+      await loadConfigs();
     }
   }
 
@@ -90,7 +124,7 @@ export default function Home() {
       .eq("id", id);
 
     setMessage(error ? error.message : "حذف شد");
-    loadConfigs();
+    await loadConfigs();
   }
 
   async function copyConfig(value: string) {
@@ -114,20 +148,26 @@ export default function Home() {
 
         {loading ? (
           <p>در حال بارگذاری...</p>
-        ) : configs.length === 0 ? (
-          <p>فعلاً کانفیگی ثبت نشده.</p>
         ) : (
-          configs.map((item) => (
-            <article className="config" key={item.id}>
-              <div>
-                <strong>{item.name}</strong>
-                <span>{item.type}</span>
-              </div>
-              <button onClick={() => copyConfig(item.config)}>
-                کپی کانفیگ
-              </button>
-            </article>
-          ))
+          <>
+            {configs.filter((item) => item.active).length === 0 ? (
+              <p>فعلاً کانفیگ فعالی ثبت نشده.</p>
+            ) : (
+              configs
+                .filter((item) => item.active)
+                .map((item) => (
+                  <article className="config" key={item.id}>
+                    <div>
+                      <strong>{item.name}</strong>
+                      <span>{item.type}</span>
+                    </div>
+                    <button onClick={() => copyConfig(item.config)}>
+                      کپی کانفیگ
+                    </button>
+                  </article>
+                ))
+            )}
+          </>
         )}
       </section>
 
@@ -181,16 +221,32 @@ export default function Home() {
 
             <button onClick={addConfig}>ثبت کانفیگ</button>
 
-            <h3>حذف کانفیگ‌ها</h3>
+            <h3>مدیریت کانفیگ‌ها</h3>
+
             {configs.map((item) => (
               <article className="config" key={item.id}>
-                <strong>{item.name}</strong>
-                <button
-                  className="danger"
-                  onClick={() => deleteConfig(item.id)}
-                >
-                  حذف
-                </button>
+                <div>
+                  <strong>{item.name}</strong>
+                  <span>
+                    {item.type} - {item.active ? "فعال" : "غیرفعال"}
+                  </span>
+                </div>
+
+                <div>
+                  <button
+                    className="secondary"
+                    onClick={() => toggleConfig(item)}
+                  >
+                    {item.active ? "غیرفعال کردن" : "فعال کردن"}
+                  </button>
+
+                  <button
+                    className="danger"
+                    onClick={() => deleteConfig(item.id)}
+                  >
+                    حذف
+                  </button>
+                </div>
               </article>
             ))}
           </>
@@ -202,4 +258,4 @@ export default function Home() {
       <footer>اتصال VPN از طریق برنامه VPN گوشی انجام می‌شود.</footer>
     </main>
   );
-            }
+                }

@@ -1,27 +1,27 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabase";
+import { supabase } from "@/lib/supabase";
 
-type VPNConfig = {
+type Config = {
   id: string;
   name: string;
   type: string;
   config: string;
   active: boolean;
+  created_at: string;
 };
 
 export default function Home() {
-  const [configs, setConfigs] = useState<VPNConfig[]>([]);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [configs, setConfigs] = useState<Config[]>([]);
   const [name, setName] = useState("");
   const [type, setType] = useState("VLESS");
   const [config, setConfig] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [loggedIn, setLoggedIn] = useState(false);
   const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
 
   async function loadConfigs() {
     const { data, error } = await supabase
@@ -30,21 +30,21 @@ export default function Home() {
       .order("created_at", { ascending: false });
 
     if (error) {
-      setMessage(error.message);
-    } else {
-      setConfigs(data || []);
+      setMessage("خطا در دریافت کانفیگ‌ها");
+      return;
     }
 
-    setLoading(false);
+    setConfigs(data || []);
   }
 
   useEffect(() => {
-    loadConfigs();
-
-    supabase.auth.getSession().then(({ data }) => {
+    async function init() {
+      const { data } = await supabase.auth.getSession();
       setLoggedIn(!!data.session);
-      loadConfigs();
-    });
+      await loadConfigs();
+    }
+
+    init();
 
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
@@ -57,143 +57,141 @@ export default function Home() {
   }, []);
 
   async function login() {
+    setLoading(true);
+    setMessage("");
+
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
-    setMessage(error ? error.message : "وارد شدی");
-    if (!error) {
-      setLoggedIn(true);
-      await loadConfigs();
+    setLoading(false);
+
+    if (error) {
+      setMessage("ایمیل یا رمز عبور اشتباه است");
+      return;
     }
+
+    setLoggedIn(true);
+    await loadConfigs();
+    setMessage("ورود موفق بود");
   }
 
   async function logout() {
     await supabase.auth.signOut();
     setLoggedIn(false);
-    setMessage("خارج شدی");
     await loadConfigs();
+    setMessage("خارج شدید");
   }
 
   async function addConfig() {
     if (!name.trim() || !config.trim()) {
-      setMessage("نام و متن کانفیگ رو وارد کن");
+      setMessage("نام و متن کانفیگ را وارد کنید");
       return;
     }
 
-    const { error } = await supabase.from("vpn_configs").insert({
-      name,
-      type,
-      config,
-      active: true,
-    });
+    setLoading(true);
+
+    const { error } = await supabase.from("vpn_configs").insert([
+      {
+        name: name.trim(),
+        type,
+        config: config.trim(),
+        active: true,
+      },
+    ]);
+
+    setLoading(false);
 
     if (error) {
-      setMessage(error.message);
-    } else {
-      setName("");
-      setConfig("");
-      setMessage("کانفیگ اضافه شد");
-      await loadConfigs();
+      setMessage("خطا در افزودن کانفیگ");
+      return;
     }
+
+    setName("");
+    setConfig("");
+    setMessage("کانفیگ اضافه شد");
+    await loadConfigs();
   }
 
-  async function toggleConfig(item: VPNConfig) {
+  async function toggleConfig(item: Config) {
     const { error } = await supabase
       .from("vpn_configs")
       .update({ active: !item.active })
       .eq("id", item.id);
 
     if (error) {
-      setMessage(error.message);
-    } else {
-      setMessage(
-        item.active
-          ? "کانفیگ غیرفعال شد"
-          : "کانفیگ دوباره فعال شد"
-      );
-      await loadConfigs();
+      setMessage("تغییر وضعیت انجام نشد");
+      return;
     }
+
+    setMessage(item.active ? "کانفیگ غیرفعال شد" : "کانفیگ فعال شد");
+    await loadConfigs();
   }
 
   async function deleteConfig(id: string) {
+    if (!confirm("این کانفیگ حذف شود؟")) return;
+
     const { error } = await supabase
       .from("vpn_configs")
       .delete()
       .eq("id", id);
 
-    setMessage(error ? error.message : "حذف شد");
+    if (error) {
+      setMessage("حذف انجام نشد");
+      return;
+    }
+
+    setMessage("کانفیگ حذف شد");
     await loadConfigs();
   }
 
   async function copyConfig(value: string) {
     try {
       await navigator.clipboard.writeText(value);
-      setMessage("کانفیگ کپی شد؛ حالا داخل برنامه VPN واردش کن");
+      setMessage("کانفیگ کپی شد");
     } catch {
-      setMessage("کپی خودکار انجام نشد");
+      setMessage("کپی انجام نشد؛ متن را دستی کپی کنید");
     }
   }
 
+  const activeConfigs = configs.filter((item) => item.active);
+
   return (
-    <main className="container">
-      <header>
-        <h1>پنل کانفیگ VPN</h1>
-        <p>کانفیگ موردنظرت رو انتخاب و کپی کن</p>
-      </header>
+    <main dir="rtl">
+      <div className="container">
+        <h1>پنل مدیریت کانفیگ VPN</h1>
+        <p>مدیریت و اشتراک‌گذاری کانفیگ‌ها</p>
 
-      <section className="panel">
-        <h2>کانفیگ‌های موجود</h2>
-
-        {loading ? (
-          <p>در حال بارگذاری...</p>
-        ) : (
-          <>
-            {configs.filter((item) => item.active).length === 0 ? (
-              <p>فعلاً کانفیگ فعالی ثبت نشده.</p>
-            ) : (
-              configs
-                .filter((item) => item.active)
-                .map((item) => (
-                  <article className="config" key={item.id}>
-                    <div>
-                      <strong>{item.name}</strong>
-                      <span>{item.type}</span>
-                    </div>
-                    <button onClick={() => copyConfig(item.config)}>
-                      کپی کانفیگ
-                    </button>
-                  </article>
-                ))
-            )}
-          </>
-        )}
-      </section>
-
-      <section className="panel">
-        <h2>مدیریت پنل</h2>
+        {message && <p>{message}</p>}
 
         {!loggedIn ? (
-          <>
+          <section>
+            <h2>ورود مدیر</h2>
+
             <input
+              type="email"
               placeholder="ایمیل مدیر"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
+
             <input
               type="password"
               placeholder="رمز عبور"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
-            <button onClick={login}>ورود مدیر</button>
-          </>
-        ) : (
-          <>
-            <button className="secondary" onClick={logout}>
-              خروج
+
+            <button onClick={login} disabled={loading}>
+              ورود
             </button>
+          </section>
+        ) : (
+          <section>
+            <h2>مدیریت کانفیگ‌ها</h2>
+
+            <button onClick={logout}>خروج</button>
 
             <h3>افزودن کانفیگ جدید</h3>
 
@@ -203,7 +201,10 @@ export default function Home() {
               onChange={(e) => setName(e.target.value)}
             />
 
-            <select value={type} onChange={(e) => setType(e.target.value)}>
+            <select
+              value={type}
+              onChange={(e) => setType(e.target.value)}
+            >
               <option>VLESS</option>
               <option>VMess</option>
               <option>Trojan</option>
@@ -213,49 +214,78 @@ export default function Home() {
             </select>
 
             <textarea
-              placeholder="متن کانفیگ یا لینک اشتراک"
+              placeholder="متن کانفیگ"
               value={config}
               onChange={(e) => setConfig(e.target.value)}
               rows={5}
             />
 
-            <button onClick={addConfig}>ثبت کانفیگ</button>
+            <button onClick={addConfig} disabled={loading}>
+              افزودن کانفیگ
+            </button>
 
-            <h3>مدیریت کانفیگ‌ها</h3>
+            <h3>فهرست همه کانفیگ‌ها</h3>
+
+            {configs.length === 0 && <p>هنوز کانفیگی ثبت نشده است.</p>}
 
             {configs.map((item) => (
-              <article className="config" key={item.id}>
-                <div>
-                  <strong>{item.name}</strong>
-                  <span>
-                    {item.type} - {item.active ? "فعال" : "غیرفعال"}
-                  </span>
-                </div>
+              <div
+                key={item.id}
+                className="config-card"
+                style={{
+                  border: "1px solid #555",
+                  borderRadius: "10px",
+                  padding: "15px",
+                  margin: "12px 0",
+                }}
+              >
+                <h3>{item.name}</h3>
+                <p>نوع: {item.type}</p>
+                <p>
+                  وضعیت: {item.active ? "فعال" : "غیرفعال"}
+                </p>
 
-                <div>
-                  <button
-                    className="secondary"
-                    onClick={() => toggleConfig(item)}
-                  >
-                    {item.active ? "غیرفعال کردن" : "فعال کردن"}
-                  </button>
+                <button onClick={() => toggleConfig(item)}>
+                  {item.active ? "غیرفعال کردن" : "فعال کردن"}
+                </button>
 
-                  <button
-                    className="danger"
-                    onClick={() => deleteConfig(item.id)}
-                  >
-                    حذف
-                  </button>
-                </div>
-              </article>
+                <button onClick={() => deleteConfig(item.id)}>
+                  حذف
+                </button>
+              </div>
             ))}
-          </>
+          </section>
         )}
 
-        {message && <p className="message">{message}</p>}
-      </section>
+        <hr />
 
-      <footer>اتصال VPN از طریق برنامه VPN گوشی انجام می‌شود.</footer>
+        <section>
+          <h2>کانفیگ‌های فعال</h2>
+
+          {activeConfigs.length === 0 && (
+            <p>فعلاً کانفیگ فعالی وجود ندارد.</p>
+          )}
+
+          {activeConfigs.map((item) => (
+            <div
+              key={item.id}
+              className="config-card"
+              style={{
+                border: "1px solid #555",
+                borderRadius: "10px",
+                padding: "15px",
+                margin: "12px 0",
+              }}
+            >
+              <h3>{item.name}</h3>
+              <p>نوع: {item.type}</p>
+              <button onClick={() => copyConfig(item.config)}>
+                کپی کانفیگ
+              </button>
+            </div>
+          ))}
+        </section>
+      </div>
     </main>
   );
-                }
+}

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminSupabase } from "@/lib/server-supabase";
 import {
-  createUserSession,
   verifyPassword,
+  createSessionToken,
+  hashToken,
 } from "@/lib/user-auth";
 
 export async function POST(request: NextRequest) {
@@ -40,19 +41,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const session = await createUserSession(user.id);
+    const token = createSessionToken();
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    const { error: insertError } = await adminSupabase
+      .from("vpn_user_sessions")
+      .insert({
+        user_id: user.id,
+        token_hash: hashToken(token),
+        expires_at: expiresAt.toISOString(),
+      });
+
+    if (insertError) throw insertError;
 
     const response = NextResponse.json({
       success: true,
       username: user.username,
     });
 
-    response.cookies.set("user_session", session.token, {
+    response.cookies.set("vpn_user_session", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-      expires: session.expiresAt,
+      expires: expiresAt,
     });
 
     return response;

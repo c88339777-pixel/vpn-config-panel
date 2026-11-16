@@ -503,3 +503,108 @@ button svg {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* آمار کلی با ظاهر Liquid Glass سبک و کم‌مصرف */
+.stats-overview {
+  position: relative;
+  overflow: hidden;
+  margin: 16px 0 22px;
+  padding: 16px;
+  border: 1px solid #8acfff2b;
+  border-radius: 19px;
+  background:
+    linear-gradient(135deg, #1b385b9c, #101b2dc9 58%, #172b43a8);
+  box-shadow:
+    inset 0 1px 0 #ffffff12,
+    0 10px 28px #00000020;
+  -webkit-backdrop-filter: blur(8px) saturate(115%);
+  backdrop-filter: blur(8px) saturate(115%);
+}
+
+.stats-overview::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(115deg, #ffffff0b, transparent 38%, #19a9ff08);
+}
+
+.stats-grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.stats-card {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 13px 11px;
+  border: 1px solid #b8dcff1c;
+  border-radius: 14px;
+  background: linear-gradient(145deg, #ffffff0d, #ffffff05);
+  box-shadow: inset 0 1px 0 #ffffff0a;
+}
+
+.stats-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #79ccff;
+}
+
+.stats-label {
+  color: #b8c8da;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.stats-value {
+  color: #f4faff;
+  font-size: 23px;
+  line-height: 1.2;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.stats-note {
+  position: relative;
+  margin: 12px 2px 0;
+  color: #9fb5cb;
+  font-size: 11px;
+}
+
+/* نمایش ساده در مرورگرهایی که blur را پشتیبانی نمی‌کنند */
+@supports not ((backdrop-filter: blur(8px)) or (-webkit-backdrop-filter: blur(8px))) {
+  .stats-overview {
+    background: #14243a;
+  }
+}
+
+@media (max-width: 700px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .stats-card:last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 360px) {
+  .stats-overview {
+    padding: 11px;
+  }
+
+  .stats-card {
+    padding: 11px 9px;
+  }
+
+  .stats-value {
+    font-size: 20px;
+  }
+}

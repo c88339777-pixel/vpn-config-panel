@@ -1039,6 +1039,47 @@ export default function Home() {
             <section className="panel">
               <h2><Users size={20} /> مدیریت کاربران</h2>
 
+              <div className="stats-overview" aria-label="آمار کلی پنل">
+                <div className="stats-grid">
+                  <div className="stats-card">
+                    <span className="stats-icon"><Users size={19} /></span>
+                    <span className="stats-label">کل کاربران</span>
+                    <strong className="stats-value">{users.length}</strong>
+                  </div>
+                  <div className="stats-card">
+                    <span className="stats-icon"><UserRound size={19} /></span>
+                    <span className="stats-label">حساب‌های فعال</span>
+                    <strong className="stats-value">{users.filter((user) => user.active).length}</strong>
+                  </div>
+                  <div className="stats-card">
+                    <span className="stats-icon"><Server size={19} /></span>
+                    <span className="stats-label">کل کانفیگ‌ها</span>
+                    <strong className="stats-value">{configs.length}</strong>
+                  </div>
+                  <div className="stats-card">
+                    <span className="stats-icon"><CalendarDays size={19} /></span>
+                    <span className="stats-label">اشتراک‌های فعال</span>
+                    <strong className="stats-value">
+                      {users.filter((user) => {
+                        const status = getSubscriptionStatus(user.plan_expires_at);
+                        return status.className === "subscription-active" ||
+                          status.className === "subscription-warning";
+                      }).length}
+                    </strong>
+                  </div>
+                  <div className="stats-card">
+                    <span className="stats-icon"><Power size={19} /></span>
+                    <span className="stats-label">اشتراک‌های منقضی</span>
+                    <strong className="stats-value">
+                      {users.filter((user) =>
+                        getSubscriptionStatus(user.plan_expires_at).className === "subscription-expired"
+                      ).length}
+                    </strong>
+                  </div>
+                </div>
+                <p className="stats-note">آمار به‌روز شده بر اساس اطلاعات فعلی پنل</p>
+              </div>
+
               <form
                 onSubmit={(event) => {
                   event.preventDefault();

@@ -16,7 +16,7 @@ function Icon({
   name,
   size = 19,
 }: {
-  name: "copy" | "edit" | "trash" | "plus" | "check" | "x" | "logout" | "settings";
+  name: "copy" | "edit" | "trash" | "plus" | "check" | "x" | "logout";
   size?: number;
 }) {
   const common = {
@@ -67,13 +67,6 @@ function Icon({
           <path d="M10 17l5-5-5-5" />
           <path d="M15 12H3" />
           <path d="M12 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6" />
-        </>
-      )}
-
-      {name === "settings" && (
-        <>
-          <path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z" />
-          <path d="M19.4 15a1.65 1.65 0 0 0 .3 1.9l.1.1-1.7 2.9-.2-.1a1.7 1.7 0 0 0-1.9.1 1.7 1.7 0 0 0-.9 1.5v.2h-3.4v-.2a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9-.1l-.2.1-1.7-2.9.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-.9h-.2v-3.4h.2a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.1-1.9l-.1-.2 2.9-1.7.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 .9-1.5v-.2h3.4v.2a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.1l.2-.1 1.7 2.9-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5.9h.2v3.4h-.2a1.7 1.7 0 0 0-1.5.9Z" />
         </>
       )}
     </svg>
@@ -327,10 +320,7 @@ export default function Home() {
                 gap: "10px",
               }}
             >
-              <h2 style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <Icon name="settings" />
-                مدیریت
-              </h2>
+              <h2>مدیریت</h2>
 
               <button
                 className="secondary"

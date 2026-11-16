@@ -1053,4 +1053,324 @@ export default function Home() {
                     <strong className="stats-value">{users.filter((user) => user.active).length}</strong>
                   </div>
                   <div className="stats-card">
-                    <span className="stats-icon"><Server size={1
+                    <span className="stats-icon"><Server size={19} /></span>
+                    <span className="stats-label">کل کانفیگ‌ها</span>
+                    <strong className="stats-value">{configs.length}</strong>
+                  </div>
+                  <div className="stats-card">
+                    <span className="stats-icon"><CalendarDays size={19} /></span>
+                    <span className="stats-label">اشتراک‌های فعال</span>
+                    <strong className="stats-value">
+                      {users.filter((user) => {
+                        const status = getSubscriptionStatus(user.plan_expires_at);
+                        return status.className === "subscription-active" ||
+                          status.className === "subscription-warning";
+                      }).length}
+                    </strong>
+                  </div>
+                  <div className="stats-card">
+                    <span className="stats-icon"><Power size={19} /></span>
+                    <span className="stats-label">اشتراک‌های منقضی</span>
+                    <strong className="stats-value">
+                      {users.filter((user) =>
+                        getSubscriptionStatus(user.plan_expires_at).className === "subscription-expired"
+                      ).length}
+                    </strong>
+                  </div>
+                </div>
+                <p className="stats-note">آمار به‌روز شده بر اساس اطلاعات فعلی پنل</p>
+              </div>
+
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  createUser();
+                }}
+              >
+                <input
+                  type="text"
+                  placeholder="نام کاربری جدید"
+                  value={newUsername}
+                  onChange={(event) => setNewUsername(event.target.value)}
+                  required
+                />
+
+                <input
+                  type="password"
+                  placeholder="رمز عبور جدید"
+                  value={newUserPassword}
+                  onChange={(event) => setNewUserPassword(event.target.value)}
+                  required
+                />
+
+                <button type="submit" disabled={loading}>
+                  <UserPlus size={18} />
+                  ساخت کاربر
+                </button>
+              </form>
+
+              <h3>فهرست کاربران ({filteredUsers.length} از {users.length})</h3>
+
+              <div className="user-tools">
+                <div className="user-search">
+                  <Search size={18} />
+                  <input
+                    type="search"
+                    placeholder="جست‌وجوی نام کاربری..."
+                    value={userSearch}
+                    onChange={(event) => setUserSearch(event.target.value)}
+                    aria-label="جست‌وجوی کاربران"
+                  />
+                </div>
+
+                <select
+                  value={userFilter}
+                  onChange={(event) => setUserFilter(event.target.value)}
+                  aria-label="فیلتر وضعیت کاربران"
+                >
+                  <option value="all">همه کاربران</option>
+                  <option value="account-active">حساب‌های فعال</option>
+                  <option value="account-inactive">حساب‌های غیرفعال</option>
+                  <option value="subscription-active">اشتراک فعال</option>
+                  <option value="subscription-warning">نزدیک انقضا</option>
+                  <option value="subscription-expired">اشتراک منقضی‌شده</option>
+                </select>
+              </div>
+
+              {filteredUsers.length === 0 ? (
+                <p className="message">کاربری با این جست‌وجو یا فیلتر پیدا نشد.</p>
+              ) : filteredUsers.map((user) => {
+                const subscriptionStatus = getSubscriptionStatus(user.plan_expires_at);
+
+                return (
+                  <div className="panel user-card" key={user.id}>
+                    <div className="user-card-header">
+                      <div>
+                        <h3 className="user-card-name">
+                          <UserRound size={19} />
+                          {user.username}
+                        </h3>
+                        <span className={`status-badge ${user.active ? "account-active" : "account-inactive"}`}>
+                          {user.active ? "حساب فعال" : "حساب غیرفعال"}
+                        </span>
+                      </div>
+
+                      <span className={`status-badge subscription-badge ${subscriptionStatus.className}`}>
+                        {subscriptionStatus.label}
+                      </span>
+                    </div>
+
+                    <div className="user-subscription-info">
+                      <div className="user-info-row">
+                        <span>شروع اشتراک</span>
+                        <strong>{formatDate(user.plan_start)}</strong>
+                      </div>
+                      <div className="user-info-row">
+                        <span>پایان اشتراک</span>
+                        <strong>{formatDate(user.plan_expires_at)}</strong>
+                      </div>
+                      <p className={`subscription-detail ${subscriptionStatus.className}`}>
+                        {subscriptionStatus.detail}
+                      </p>
+                    </div>
+
+                    <div className="user-card-actions">
+                      <button
+                        type="button"
+                        onClick={() => openAssignments(user)}
+                        title="مدیریت اشتراک و کانفیگ‌ها"
+                      >
+                        <Settings size={18} />
+                        مدیریت اشتراک و کانفیگ‌ها
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => toggleUser(user)}
+                        title={user.active ? "غیرفعال کردن کاربر" : "فعال کردن کاربر"}
+                      >
+                        <Power size={18} />
+                        {user.active ? "غیرفعال کردن" : "فعال کردن"}
+                      </button>
+
+                      <input
+                        type="password"
+                        placeholder="رمز عبور جدید"
+                        value={passwordChanges[user.id] || ""}
+                        onChange={(event) =>
+                          setPasswordChanges((previous) => ({
+                            ...previous,
+                            [user.id]: event.target.value,
+                          }))
+                        }
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() => changeUserPassword(user)}
+                      >
+                        <KeyRound size={18} />
+                        تغییر رمز
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => deleteUser(user)}
+                        className="danger"
+                      >
+                        <Trash2 size={18} />
+                        حذف کاربر
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </section>
+
+            {selectedUser && (
+              <section className="panel">
+                <h2>
+                  <Settings size={20} /> مدیریت کاربر: {selectedUser.username}
+                </h2>
+
+                <h3><CalendarDays size={18} /> تنظیم اشتراک</h3>
+
+                <label>تاریخ شروع اشتراک</label>
+                <input
+                  type="date"
+                  value={planStart}
+                  onChange={(event) => setPlanStart(event.target.value)}
+                />
+
+                <label>تاریخ پایان اشتراک</label>
+                <input
+                  type="date"
+                  value={planExpiry}
+                  onChange={(event) => setPlanExpiry(event.target.value)}
+                />
+
+                <label><HardDrive size={16} /> حجم کل به گیگابایت (خالی = نامحدود)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  placeholder="مثلاً 100"
+                  value={totalGb}
+                  onChange={(event) => setTotalGb(event.target.value)}
+                />
+
+                <label>حجم مصرف‌شده به گیگابایت</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value={usedGb}
+                  onChange={(event) => setUsedGb(event.target.value)}
+                />
+
+                <button
+                  type="button"
+                  onClick={saveSubscription}
+                  disabled={loading}
+                >
+                  <Check size={18} />
+                  ذخیره اشتراک
+                </button>
+
+                <h3>تمدید اشتراک</h3>
+
+                <label>تعداد روز تمدید</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={renewDays}
+                  onChange={(event) => setRenewDays(event.target.value)}
+                />
+
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={resetUsage}
+                    onChange={(event) => setResetUsage(event.target.checked)}
+                  />
+                  صفر کردن حجم مصرف‌شده
+                </label>
+
+                <button
+                  type="button"
+                  onClick={renewSubscription}
+                  disabled={loading}
+                >
+                  <CalendarDays size={18} />
+                  تمدید اشتراک
+                </button>
+
+                <h3><Server size={18} /> اختصاص کانفیگ به کاربر</h3>
+
+                {configs.length === 0 ? (
+                  <p>هنوز کانفیگی ثبت نشده است.</p>
+                ) : (
+                  configs.map((item) => {
+                    const assigned = assignedConfigIds.includes(String(item.id));
+
+                    return (
+                      <div className="panel" key={item.id}>
+                        <p>{item.name} ({item.type})</p>
+                        <p>
+                          وضعیت کانفیگ: {item.active ? "فعال" : "غیرفعال"}
+                        </p>
+
+                        <button
+                          type="button"
+                          onClick={() => toggleAssignment(item.id)}
+                          disabled={loading}
+                          title={assigned ? "حذف دسترسی کاربر" : "اختصاص به کاربر"}
+                        >
+                          {assigned ? (
+                            <>
+                              <X size={18} />
+                              حذف دسترسی کاربر
+                            </>
+                          ) : (
+                            <>
+                              <Check size={18} />
+                              اختصاص به کاربر
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    );
+                  })
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedUser(null);
+                    setAssignedConfigIds([]);
+                  }}
+                  className="secondary"
+                >
+                  <X size={18} />
+                  بستن مدیریت کاربر
+                </button>
+              </section>
+            )}
+
+            <section className="panel">
+              <button
+                type="button"
+                onClick={logout}
+                disabled={loading}
+                title="خروج مدیر"
+              >
+                <LogOut size={18} />
+                خروج مدیر
+              </button>
+            </section>
+          </>
+        )}
+      </div>
+    </main>
+  );
+}

@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
 
   const { data, error } = await adminSupabase
     .from("vpn_users")
-    .select("id, username, active, created_at")
+    .select("id, username, active, created_at, plan_start, plan_expires_at, total_gb, used_gb")
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
         password_hash,
         active: true,
       })
-      .select("id, username, active, created_at")
+      .select("id, username, active, created_at, plan_start, plan_expires_at, total_gb, used_gb")
       .single();
 
     if (error) {
@@ -91,6 +91,10 @@ export async function PATCH(request: NextRequest) {
     const updates: {
       active?: boolean;
       password_hash?: string;
+      plan_start?: string | null;
+      plan_expires_at?: string | null;
+      total_gb?: number | null;
+      used_gb?: number;
     } = {};
 
     if (typeof body.active === "boolean") {
@@ -108,6 +112,52 @@ export async function PATCH(request: NextRequest) {
       updates.password_hash = await hashPassword(body.password);
     }
 
+    if (body.plan_start !== undefined) {
+      if (
+        body.plan_start !== null &&
+        (typeof body.plan_start !== "string" ||
+          !Number.isFinite(Date.parse(body.plan_start)))
+      ) {
+        return NextResponse.json({ error: "تاریخ شروع نامعتبر است" }, { status: 400 });
+      }
+      updates.plan_start = body.plan_start;
+    }
+
+    if (body.plan_expires_at !== undefined) {
+      if (
+        body.plan_expires_at !== null &&
+        (typeof body.plan_expires_at !== "string" ||
+          !Number.isFinite(Date.parse(body.plan_expires_at)))
+      ) {
+        return NextResponse.json({ error: "تاریخ انقضا نامعتبر است" }, { status: 400 });
+      }
+      updates.plan_expires_at = body.plan_expires_at;
+    }
+
+    if (body.total_gb !== undefined) {
+      const value = body.total_gb;
+      if (value !== null && (
+        typeof value !== "number" ||
+        !Number.isFinite(value) ||
+        value < 0
+      )) {
+        return NextResponse.json({ error: "حجم کل نامعتبر است" }, { status: 400 });
+      }
+      updates.total_gb = value;
+    }
+
+    if (body.used_gb !== undefined) {
+      const value = body.used_gb;
+      if (
+        typeof value !== "number" ||
+        !Number.isFinite(value) ||
+        value < 0
+      ) {
+        return NextResponse.json({ error: "حجم مصرف‌شده نامعتبر است" }, { status: 400 });
+      }
+      updates.used_gb = value;
+    }
+
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ error: "تغییری ارسال نشده" }, { status: 400 });
     }
@@ -121,8 +171,13 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "خطا در ویرایش کاربر" }, { status: 500 });
     }
 
-    // با تغییر رمز یا غیرفعال کردن کاربر، نشست‌های قبلی باطل می‌شوند.
-    if (updates.password_hash || updates.active === false) {
+    if (
+      updates.password_hash ||
+      updates.active === false ||
+      updates.plan_expires_at !== undefined ||
+      updates.total_gb !== undefined ||
+      updates.used_gb !== undefined
+    ) {
       await adminSupabase
         .from("vpn_user_sessions")
         .delete()

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 
 type VpnConfig = {
-  id: number;
+  id: string | number;
   name: string;
   type: string;
   config: string;
@@ -15,11 +15,14 @@ type VpnConfig = {
 export default function Home() {
   const [configs, setConfigs] = useState<VpnConfig[]>([]);
   const [session, setSession] = useState<any>(null);
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [type, setType] = useState("VLESS");
   const [config, setConfig] = useState("");
+
+  const [editingId, setEditingId] = useState<string | number | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -30,7 +33,7 @@ export default function Home() {
       .order("created_at", { ascending: false });
 
     if (error) {
-      setMessage("خطا در دریافت کانفیگ‌ها: " + error.message);
+      setMessage("خطا در دریافت اطلاعات");
       return;
     }
 
@@ -67,7 +70,7 @@ export default function Home() {
     setLoading(false);
 
     if (error) {
-      setMessage("ورود ناموفق بود: " + error.message);
+      setMessage("ورود ناموفق بود");
       return;
     }
 
@@ -78,10 +81,25 @@ export default function Home() {
   async function logout() {
     await supabase.auth.signOut();
     setSession(null);
-    setMessage("از حساب خارج شدی");
+    setMessage("خارج شدی");
   }
 
-  async function addConfig() {
+  function resetForm() {
+    setName("");
+    setType("VLESS");
+    setConfig("");
+    setEditingId(null);
+  }
+
+  function startEdit(item: VpnConfig) {
+    setName(item.name);
+    setType(item.type);
+    setConfig(item.config);
+    setEditingId(item.id);
+    setMessage("در حال ویرایش: " + item.name);
+  }
+
+  async function saveConfig() {
     if (!name.trim() || !config.trim()) {
       setMessage("نام و متن کانفیگ را وارد کن");
       return;
@@ -89,24 +107,43 @@ export default function Home() {
 
     setLoading(true);
 
-    const { error } = await supabase.from("vpn_configs").insert({
-      name: name.trim(),
-      type,
-      config: config.trim(),
-      active: true,
-    });
+    if (editingId !== null) {
+      const { error } = await supabase
+        .from("vpn_configs")
+        .update({
+          name: name.trim(),
+          type,
+          config: config.trim(),
+        })
+        .eq("id", editingId);
 
-    setLoading(false);
+      if (error) {
+        setLoading(false);
+        setMessage("خطا در ویرایش: " + error.message);
+        return;
+      }
 
-    if (error) {
-      setMessage("خطا در افزودن: " + error.message);
-      return;
+      setMessage("تغییرات ذخیره شد");
+    } else {
+      const { error } = await supabase.from("vpn_configs").insert({
+        name: name.trim(),
+        type,
+        config: config.trim(),
+        active: true,
+      });
+
+      if (error) {
+        setLoading(false);
+        setMessage("خطا در افزودن: " + error.message);
+        return;
+      }
+
+      setMessage("کانفیگ اضافه شد");
     }
 
-    setName("");
-    setConfig("");
-    setMessage("کانفیگ اضافه شد");
+    resetForm();
     await loadConfigs();
+    setLoading(false);
   }
 
   async function toggleConfig(item: VpnConfig) {
@@ -120,11 +157,16 @@ export default function Home() {
       return;
     }
 
-    setMessage(item.active ? "کانفیگ غیرفعال شد" : "کانفیگ فعال شد");
-    await loadConfigs();
+    setConfigs((previous) =>
+      previous.map((configItem) =>
+        configItem.id === item.id
+          ? { ...configItem, active: !item.active }
+          : configItem
+      )
+    );
   }
 
-  async function deleteConfig(id: number) {
+  async function deleteConfig(id: string | number) {
     if (!window.confirm("این کانفیگ حذف شود؟")) return;
 
     const { error } = await supabase
@@ -137,6 +179,8 @@ export default function Home() {
       return;
     }
 
+    if (editingId === id) resetForm();
+
     setMessage("کانفیگ حذف شد");
     await loadConfigs();
   }
@@ -144,19 +188,29 @@ export default function Home() {
   async function copyConfig(value: string) {
     try {
       await navigator.clipboard.writeText(value);
-      setMessage("کانفیگ کپی شد");
+      setMessage("⧉ کپی شد");
     } catch {
-      setMessage("کپی انجام نشد؛ دسترسی مرورگر را بررسی کن");
+      setMessage("کپی انجام نشد");
     }
   }
 
   const activeConfigs = configs.filter((item) => item.active);
 
+  const iconButton = {
+    width: "44px",
+    height: "42px",
+    borderRadius: "12px",
+    fontSize: "21px",
+    cursor: "pointer",
+    border: "1px solid var(--border, #444)",
+    background: "var(--background, #222)",
+  } as const;
+
   return (
     <main dir="rtl">
       <div className="container">
-        <h1>پنل مدیریت VPN</h1>
-        <p>مدیریت و دریافت کانفیگ‌های VPN</p>
+        <h1>VPN Hub</h1>
+        <p>مدیریت کانفیگ‌ها</p>
 
         {message && <div className="message">{message}</div>}
 
@@ -166,7 +220,7 @@ export default function Home() {
 
             <input
               type="email"
-              placeholder="ایمیل مدیر"
+              placeholder="ایمیل"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
@@ -179,18 +233,26 @@ export default function Home() {
             />
 
             <button onClick={login} disabled={loading}>
-              ورود
+              {loading ? "..." : "ورود"}
             </button>
           </section>
         ) : (
           <section className="panel">
-            <h2>مدیریت کانفیگ‌ها</h2>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: "10px",
+              }}
+            >
+              <h2>⚙ مدیریت</h2>
+              <button className="secondary" onClick={logout}>
+                خروج ↗
+              </button>
+            </div>
 
-            <button onClick={logout} className="secondary">
-              خروج از مدیریت
-            </button>
-
-            <h3>افزودن کانفیگ جدید</h3>
+            <h3>{editingId !== null ? "✎ ویرایش" : "＋ کانفیگ جدید"}</h3>
 
             <input
               placeholder="نام کانفیگ"
@@ -217,57 +279,144 @@ export default function Home() {
               rows={5}
             />
 
-            <button onClick={addConfig} disabled={loading}>
-              افزودن کانفیگ
+            <button onClick={saveConfig} disabled={loading}>
+              {loading
+                ? "..."
+                : editingId !== null
+                  ? "✓ ذخیره"
+                  : "+ افزودن"}
             </button>
 
-            <h3>همه کانفیگ‌ها</h3>
-
-            {configs.length === 0 && (
-              <p>هنوز کانفیگی ثبت نشده است.</p>
+            {editingId !== null && (
+              <button
+                className="secondary"
+                onClick={resetForm}
+                disabled={loading}
+              >
+                ✕ انصراف
+              </button>
             )}
 
+            <h3>فهرست کانفیگ‌ها</h3>
+
             {configs.map((item) => (
-              <div className="config-card" key={item.id}>
-                <h3>{item.name}</h3>
-                <p>نوع: {item.type}</p>
-                <p>
-                  وضعیت: {item.active ? "فعال" : "غیرفعال"}
-                </p>
-
-                <button
-                  onClick={() => toggleConfig(item)}
-                  disabled={loading}
+              <div
+                className="config-card"
+                key={item.id}
+                style={{ marginBottom: "14px" }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "12px",
+                  }}
                 >
-                  {item.active ? "غیرفعال کردن" : "فعال کردن"}
-                </button>
+                  <div>
+                    <strong>{item.name}</strong>
+                    <p>{item.type}</p>
+                  </div>
 
-                <button
-                  className="danger"
-                  onClick={() => deleteConfig(item.id)}
-                  disabled={loading}
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={item.active}
+                    aria-label={item.active ? "غیرفعال کردن" : "فعال کردن"}
+                    title={item.active ? "غیرفعال کردن" : "فعال کردن"}
+                    onClick={() => toggleConfig(item)}
+                    style={{
+                      width: "52px",
+                      height: "32px",
+                      borderRadius: "20px",
+                      border: "none",
+                      padding: "3px",
+                      background: item.active ? "#34C759" : "#8E8E93",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: item.active ? "flex-start" : "flex-end",
+                      cursor: "pointer",
+                      flexShrink: 0,
+                      transition: "background 0.2s",
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: "26px",
+                        height: "26px",
+                        borderRadius: "50%",
+                        background: "#FFFFFF",
+                        display: "block",
+                        boxShadow: "0 1px 3px #0004",
+                      }}
+                    />
+                  </button>
+                </div>
+
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "flex-end",
+                    gap: "9px",
+                    marginTop: "14px",
+                  }}
                 >
-                  حذف
-                </button>
+                  <button
+                    style={iconButton}
+                    title="کپی"
+                    aria-label="کپی"
+                    onClick={() => copyConfig(item.config)}
+                  >
+                    ⧉
+                  </button>
+
+                  <button
+                    style={iconButton}
+                    title="ویرایش"
+                    aria-label="ویرایش"
+                    onClick={() => startEdit(item)}
+                  >
+                    ✎
+                  </button>
+
+                  <button
+                    style={{
+                      ...iconButton,
+                      color: "#EF4444",
+                    }}
+                    title="حذف"
+                    aria-label="حذف"
+                    onClick={() => deleteConfig(item.id)}
+                  >
+                    🗑
+                  </button>
+                </div>
               </div>
             ))}
           </section>
         )}
 
         <section className="panel">
-          <h2>کانفیگ‌های فعال</h2>
+          <h2>کانفیگ‌های قابل استفاده</h2>
 
           {activeConfigs.length === 0 && (
-            <p>در حال حاضر کانفیگ فعالی وجود ندارد.</p>
+            <p>کانفیگ فعالی وجود ندارد.</p>
           )}
 
           {activeConfigs.map((item) => (
             <div className="config-card" key={item.id}>
-              <h3>{item.name}</h3>
-              <p>نوع: {item.type}</p>
+              <div>
+                <strong>{item.name}</strong>
+                <p>{item.type}</p>
+              </div>
 
-              <button onClick={() => copyConfig(item.config)}>
-                کپی کانفیگ
+              <button
+                style={iconButton}
+                title="کپی"
+                aria-label="کپی کانفیگ"
+                onClick={() => copyConfig(item.config)}
+              >
+                ⧉
               </button>
             </div>
           ))}
@@ -276,3 +425,4 @@ export default function Home() {
     </main>
   );
 }
+  

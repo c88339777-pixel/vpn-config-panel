@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -40,32 +41,36 @@ function Icon({
 
   return (
     <svg {...common}>
-      {name === "copy" && <>
-        <rect x="8" y="8" width="13" height="13" rx="2" />
-        <path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" />
-      </>}
-
-      {name === "edit" && <>
-        <path d="M12 20h9" />
-        <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L9 17l-4 1 1-4Z" />
-      </>}
-
-      {name === "trash" && <>
-        <path d="M3 6h18" />
-        <path d="M8 6V4h8v2" />
-        <path d="m19 6-1 14H6L5 6" />
-        <path d="M10 11v5M14 11v5" />
-      </>}
-
+      {name === "copy" && (
+        <>
+          <rect x="8" y="8" width="13" height="13" rx="2" />
+          <path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" />
+        </>
+      )}
+      {name === "edit" && (
+        <>
+          <path d="M12 20h9" />
+          <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L9 17l-4 1 1-4Z" />
+        </>
+      )}
+      {name === "trash" && (
+        <>
+          <path d="M3 6h18" />
+          <path d="M8 6V4h8v2" />
+          <path d="m19 6-1 14H6L5 6" />
+          <path d="M10 11v5M14 11v5" />
+        </>
+      )}
       {name === "plus" && <path d="M12 5v14M5 12h14" />}
       {name === "check" && <path d="m5 12 4 4L19 6" />}
       {name === "x" && <path d="m18 6-12 12M6 6l12 12" />}
-
-      {name === "logout" && <>
-        <path d="M10 17l5-5-5-5" />
-        <path d="M15 12H3" />
-        <path d="M12 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6" />
-      </>}
+      {name === "logout" && (
+        <>
+          <path d="M10 17l5-5-5-5" />
+          <path d="M15 12H3" />
+          <path d="M12 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6" />
+        </>
+      )}
     </svg>
   );
 }
@@ -163,7 +168,6 @@ export default function Home() {
   async function loadUsers() {
     try {
       const response = await adminFetch("/api/admin/users");
-
       const result = await response.json();
 
       if (!response.ok) {
@@ -185,6 +189,7 @@ export default function Home() {
       if (!response.ok) {
         setUserMode(false);
         setUserConfigs([]);
+        setLoggedInUsername("");
         return;
       }
 
@@ -194,6 +199,7 @@ export default function Home() {
     } catch {
       setUserMode(false);
       setUserConfigs([]);
+      setLoggedInUsername("");
     }
   }
 
@@ -237,11 +243,16 @@ export default function Home() {
   }, [authReady, session]);
 
   async function adminLogin() {
+    if (!email.trim() || !adminPassword) {
+      setMessage("ایمیل و رمز عبور مدیر را وارد کن");
+      return;
+    }
+
     setLoading(true);
     setMessage("");
 
     const { data, error } = await supabase.auth.signInWithPassword({
-      email,
+      email: email.trim(),
       password: adminPassword,
     });
 
@@ -545,7 +556,9 @@ export default function Home() {
         return;
       }
 
-      setAssignedConfigIds(result.configIds || []);
+      setAssignedConfigIds(
+        (result.configIds || []).map((id: string | number) => String(id))
+      );
     } catch {
       setMessage("خطا در دریافت کانفیگ‌های کاربر");
     }
@@ -621,20 +634,17 @@ export default function Home() {
           <>
             <section className="panel">
               <h2>ورود کاربر</h2>
-
               <input
                 placeholder="نام کاربری"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
               />
-
               <input
                 type="password"
                 placeholder="رمز عبور"
                 value={userPassword}
                 onChange={(e) => setUserPassword(e.target.value)}
               />
-
               <button onClick={userLogin} disabled={loading}>
                 {loading ? "..." : "ورود به حساب"}
               </button>
@@ -642,21 +652,18 @@ export default function Home() {
 
             <section className="panel">
               <h2>ورود مدیر</h2>
-
               <input
                 type="email"
                 placeholder="ایمیل مدیر"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
-
               <input
                 type="password"
                 placeholder="رمز عبور مدیر"
                 value={adminPassword}
                 onChange={(e) => setAdminPassword(e.target.value)}
               />
-
               <button onClick={adminLogin} disabled={loading}>
                 {loading ? "..." : "ورود مدیر"}
               </button>
@@ -666,24 +673,12 @@ export default function Home() {
 
         {userMode && !session && (
           <section className="panel">
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: "10px",
-              }}
-            >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
               <div>
                 <h2>حساب کاربری</h2>
                 <p>خوش آمدی، {loggedInUsername}</p>
               </div>
-
-              <button
-                className="secondary"
-                onClick={logout}
-                style={primaryButton}
-              >
+              <button className="secondary" onClick={logout} style={primaryButton}>
                 <Icon name="logout" size={17} />
                 خروج
               </button>
@@ -699,19 +694,12 @@ export default function Home() {
               <div
                 className="config-card"
                 key={item.id}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: "12px",
-                  marginBottom: "14px",
-                }}
+                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", marginBottom: "14px" }}
               >
                 <div>
                   <strong>{item.name}</strong>
                   <p>{item.type}</p>
                 </div>
-
                 <button
                   style={iconButton}
                   title="کپی"
@@ -728,35 +716,16 @@ export default function Home() {
         {session && (
           <>
             <section className="panel">
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: "10px",
-                }}
-              >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
                 <h2>مدیریت مدیر</h2>
-
-                <button
-                  className="secondary"
-                  onClick={logout}
-                  style={primaryButton}
-                >
+                <button className="secondary" onClick={logout} style={primaryButton}>
                   <Icon name="logout" size={17} />
                   خروج
                 </button>
               </div>
 
               <h3>آمار پنل</h3>
-
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-                  gap: "10px",
-                }}
-              >
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "10px" }}>
                 {[
                   ["کل کانفیگ‌ها", configs.length],
                   ["کانفیگ‌های فعال", activeConfigs.length],
@@ -764,11 +733,7 @@ export default function Home() {
                   ["کل کاربران", users.length],
                   ["کاربران فعال", activeUsers.length],
                 ].map(([label, value]) => (
-                  <div
-                    className="config-card"
-                    key={String(label)}
-                    style={{ textAlign: "center" }}
-                  >
+                  <div className="config-card" key={String(label)} style={{ textAlign: "center" }}>
                     <strong style={{ fontSize: "24px" }}>{value}</strong>
                     <p>{label}</p>
                   </div>
@@ -790,13 +755,286 @@ export default function Home() {
                 onChange={(e) => setName(e.target.value)}
               />
 
-              <select
-                value={type}
-                onChange={(e) => setType(e.target.value)}
-              >
+              <select value={type} onChange={(e) => setType(e.target.value)}>
                 <option>VLESS</option>
                 <option>VMess</option>
                 <option>Trojan</option>
                 <option>Shadowsocks</option>
                 <option>WireGuard</option>
-            
+                <option>Subscription</option>
+              </select>
+
+              <textarea
+                placeholder="متن کانفیگ را وارد کن"
+                rows={5}
+                value={config}
+                onChange={(e) => setConfig(e.target.value)}
+              />
+
+              <button onClick={saveConfig} disabled={loading} style={primaryButton}>
+                                <Icon name={editingId !== null ? "check" : "plus"} />
+                {loading
+                  ? "..."
+                  : editingId !== null
+                    ? "ذخیره تغییرات"
+                    : "افزودن کانفیگ"}
+              </button>
+
+              {editingId !== null && (
+                <button className="secondary" onClick={resetForm}>
+                  انصراف از ویرایش
+                </button>
+              )}
+
+              <h3>کانفیگ‌های ثبت‌شده ({configs.length})</h3>
+
+              {configs.length === 0 && (
+                <p>هنوز کانفیگی ثبت نشده است.</p>
+              )}
+
+              {configs.map((item) => (
+                <div
+                  className="config-card"
+                  key={item.id}
+                  style={{ marginBottom: "12px" }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: "10px",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <div>
+                      <strong>{item.name}</strong>
+                      <p>
+                        {item.type} — {item.active ? "فعال" : "غیرفعال"}
+                      </p>
+                    </div>
+
+                    <div style={{ display: "flex", gap: "7px" }}>
+                      <button
+                        style={iconButton}
+                        title="ویرایش"
+                        onClick={() => startEdit(item)}
+                      >
+                        <Icon name="edit" />
+                      </button>
+
+                      <button
+                        style={iconButton}
+                        title={item.active ? "غیرفعال کردن" : "فعال کردن"}
+                        onClick={() => toggleConfig(item)}
+                      >
+                        <Icon name={item.active ? "x" : "check"} />
+                      </button>
+
+                      <button
+                        style={iconButton}
+                        title="حذف"
+                        onClick={() => deleteConfig(item.id)}
+                      >
+                        <Icon name="trash" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </section>
+
+            <section className="panel">
+              <h2>ساخت کاربر جدید</h2>
+
+              <input
+                placeholder="نام کاربری (حروف انگلیسی و عدد)"
+                value={newUsername}
+                onChange={(e) => setNewUsername(e.target.value)}
+              />
+
+              <input
+                type="password"
+                placeholder="رمز عبور (حداقل ۸ کاراکتر)"
+                value={newUserPassword}
+                onChange={(e) => setNewUserPassword(e.target.value)}
+              />
+
+              <button
+                onClick={createUser}
+                disabled={loading}
+                style={primaryButton}
+              >
+                <Icon name="plus" />
+                {loading ? "..." : "ساخت کاربر"}
+              </button>
+            </section>
+
+            <section className="panel">
+              <h2>مدیریت کاربران ({users.length})</h2>
+
+              {users.length === 0 && (
+                <p>هنوز کاربری ساخته نشده است.</p>
+              )}
+
+              {users.map((user) => (
+                <div
+                  className="config-card"
+                  key={user.id}
+                  style={{ marginBottom: "14px" }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: "10px",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <div>
+                      <strong>{user.username}</strong>
+                      <p>{user.active ? "فعال" : "مسدود"}</p>
+                    </div>
+
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: "7px",
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <button
+                        className="secondary"
+                        onClick={() => openAssignments(user)}
+                      >
+                        مدیریت کانفیگ‌ها
+                      </button>
+
+                      <button
+                        style={iconButton}
+                        title={user.active ? "مسدود کردن" : "فعال کردن"}
+                        onClick={() => toggleUser(user)}
+                      >
+                        <Icon name={user.active ? "x" : "check"} />
+                      </button>
+
+                      <button
+                        style={iconButton}
+                        title="حذف کاربر"
+                        onClick={() => deleteUser(user)}
+                      >
+                        <Icon name="trash" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "8px",
+                      marginTop: "12px",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <input
+                      type="password"
+                      placeholder="رمز عبور جدید"
+                      value={passwordChanges[user.id] || ""}
+                      onChange={(e) =>
+                        setPasswordChanges((previous) => ({
+                          ...previous,
+                          [user.id]: e.target.value,
+                        }))
+                      }
+                      style={{ flex: "1", minWidth: "150px" }}
+                    />
+
+                    <button
+                      className="secondary"
+                      onClick={() => changeUserPassword(user)}
+                    >
+                      تغییر رمز
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </section>
+
+            {selectedUser && (
+              <section className="panel">
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: "10px",
+                  }}
+                >
+                  <h2>
+                    کانفیگ‌های کاربر {selectedUser.username}
+                  </h2>
+
+                  <button
+                    className="secondary"
+                    onClick={() => setSelectedUser(null)}
+                  >
+                    بستن
+                  </button>
+                </div>
+
+                <p>
+                  برای اختصاص یا برداشتن کانفیگ، روی دکمه کنار آن بزن.
+                </p>
+
+                {configs.length === 0 && (
+                  <p>هیچ کانفیگی در پنل وجود ندارد.</p>
+                )}
+
+                {configs.map((item) => {
+                  const assigned = assignedConfigIds.includes(
+                    String(item.id)
+                  );
+
+                  return (
+                    <div
+                      className="config-card"
+                      key={item.id}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: "10px",
+                        marginBottom: "10px",
+                      }}
+                    >
+                      <div>
+                        <strong>{item.name}</strong>
+                        <p>
+                          {item.type} — {item.active ? "فعال" : "غیرفعال"}
+                        </p>
+                      </div>
+
+                      <button
+                        className={assigned ? "secondary" : ""}
+                        onClick={() => toggleAssignment(item.id)}
+                        disabled={!item.active && !assigned}
+                        style={primaryButton}
+                      >
+                        <Icon
+                          name={assigned ? "x" : "plus"}
+                          size={17}
+                        />
+                        {assigned ? "برداشتن" : "اختصاص"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </section>
+            )}
+          </>
+        )}
+      </div>
+    </main>
+  );
+}

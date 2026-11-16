@@ -31,93 +31,6 @@ type Subscription = {
   remaining_gb: number | null;
 };
 
-function Icon({
-  name,
-  size = 19,
-}: {
-  name: "copy" | "edit" | "trash" | "plus" | "check" | "x" | "logout";
-  size?: number;
-}) {
-  const common = {
-    width: size,
-    height: size,
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: 1.8,
-    strokeLinecap: "round" as const,
-    strokeLinejoin: "round" as const,
-    style: { display: "block", flexShrink: 0 },
-  };
-
-  return (
-    <svg {...common}>
-      {name === "copy" && (
-        <>
-          <rect x="8" y="8" width="13" height="13" rx="2" />
-          <path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" />
-        </>
-      )}
-      {name === "edit" && (
-        <>
-          <path d="M12 20h9" />
-          <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L9 17l-4 1 1-4Z" />
-        </>
-      )}
-      {name === "trash" && (
-        <>
-          <path d="M3 6h18" />
-          <path d="M8 6V4h8v2" />
-          <path d="m19 6-1 14H6L5 6" />
-          <path d="M10 11v5M14 11v5" />
-        </>
-      )}
-      {name === "plus" && <path d="M12 5v14M5 12h14" />}
-      {name === "check" && <path d="m5 12 4 4L19 6" />}
-      {name === "x" && <path d="m18 6-12 12M6 6l12 12" />}
-      {name === "logout" && (
-        <>
-          <path d="M10 17l5-5-5-5" />
-          <path d="M15 12H3" />
-          <path d="M12 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6" />
-        </>
-      )}
-    </svg>
-  );
-}
-
-function toDateInput(value?: string | null) {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
-  return local.toISOString().slice(0, 16);
-}
-
-function formatDate(value?: string | null) {
-  if (!value) return "تعیین نشده";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "نامعتبر";
-  return date.toLocaleString("fa-IR");
-}
-
-function getSubscriptionStatus(user: VpnUser) {
-  const now = Date.now();
-  const start = user.plan_start ? new Date(user.plan_start).getTime() : null;
-  const expiry = user.plan_expires_at
-    ? new Date(user.plan_expires_at).getTime()
-    : null;
-  const total = user.total_gb == null ? null : Number(user.total_gb);
-  const used = Number(user.used_gb || 0);
-
-  if (!user.active) return "مسدود";
-  if (start !== null && start > now) return "شروع نشده";
-  if (expiry !== null && expiry <= now) return "منقضی";
-  if (total !== null && used >= total) return "اتمام حجم";
-  if (!start && !expiry && total === null) return "بدون اشتراک";
-  return "فعال";
-}
-
 export default function Home() {
   const [session, setSession] = useState<any>(null);
   const [authReady, setAuthReady] = useState(false);
@@ -129,8 +42,10 @@ export default function Home() {
 
   const [email, setEmail] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
+
   const [username, setUsername] = useState("");
   const [userPassword, setUserPassword] = useState("");
+  const [loggedInUsername, setLoggedInUsername] = useState("");
 
   const [newUsername, setNewUsername] = useState("");
   const [newUserPassword, setNewUserPassword] = useState("");
@@ -138,8 +53,8 @@ export default function Home() {
   const [name, setName] = useState("");
   const [type, setType] = useState("VLESS");
   const [config, setConfig] = useState("");
-
   const [editingId, setEditingId] = useState<string | number | null>(null);
+
   const [selectedUser, setSelectedUser] = useState<VpnUser | null>(null);
   const [assignedConfigIds, setAssignedConfigIds] = useState<string[]>([]);
   const [passwordChanges, setPasswordChanges] = useState<Record<string, string>>({});
@@ -154,48 +69,31 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [userMode, setUserMode] = useState(false);
-  const [loggedInUsername, setLoggedInUsername] = useState("");
 
   const activeConfigs = configs.filter((item) => item.active);
   const inactiveConfigs = configs.filter((item) => !item.active);
-  const activeUsers = users.filter((item) => item.active);
-
-  const iconButton = {
-    width: "40px",
-    height: "40px",
-    minWidth: "40px",
-    padding: 0,
-    borderRadius: "11px",
-    cursor: "pointer",
-    border: "1px solid var(--border, #444)",
-    background: "var(--background, #222)",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    lineHeight: 1,
-    flexShrink: 0,
-  } as const;
-
-  const primaryButton = {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "8px",
-  } as const;
 
   async function adminFetch(url: string, options: RequestInit = {}) {
     if (!session?.access_token) {
-      throw new Error("نشست مدیر معتبر نیست");
+      throw new Error("نشست مدیر معتبر نیست. دوباره وارد شوید.");
     }
 
-    const headers = new Headers(options.headers);
-    headers.set("Authorization", `Bearer ${session.access_token}`);
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+        ...(options.headers || {}),
+      },
+    });
 
-    if (options.body) {
-      headers.set("Content-Type", "application/json");
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(data.error || data.message || "خطا در ارتباط با سرور");
     }
 
-    return fetch(url, { ...options, headers });
+    return data;
   }
 
   async function loadConfigs() {
@@ -209,81 +107,74 @@ export default function Home() {
       return;
     }
 
-    setConfigs(data || []);
+    setConfigs((data || []) as VpnConfig[]);
   }
 
   async function loadUsers() {
     try {
-      const response = await adminFetch("/api/admin/users");
-      const result = await response.json();
-
-      if (!response.ok) {
-        setMessage(result.error || "خطا در دریافت کاربران");
-        return;
-      }
-
-      setUsers(result.users || []);
-
-      if (selectedUser) {
-        const updated = (result.users || []).find(
-          (item: VpnUser) => item.id === selectedUser.id
-        );
-        if (updated) setSelectedUser(updated);
-      }
-    } catch {
-      setMessage("ارتباط با سرور برقرار نشد");
+      const data = await adminFetch("/api/admin/users");
+      setUsers(data.users || []);
+    } catch (error: any) {
+      setMessage(error.message || "خطا در دریافت کاربران");
     }
   }
 
   async function loadUserConfigs() {
     try {
-      const response = await fetch("/api/user/configs");
-      const result = await response.json();
+      const response = await fetch("/api/user/configs", {
+        cache: "no-store",
+      });
+
+      const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
         setUserMode(false);
         setUserConfigs([]);
         setSubscription(null);
-        setLoggedInUsername("");
-        return false;
+        return;
       }
 
       setUserMode(true);
-      setLoggedInUsername(result.username || "");
-      setUserConfigs(result.configs || []);
-      setSubscription(result.subscription || null);
-      return true;
+      setLoggedInUsername(data.username || "");
+      setUserConfigs(data.configs || []);
+      setSubscription(data.subscription || null);
     } catch {
       setUserMode(false);
       setUserConfigs([]);
       setSubscription(null);
-      setLoggedInUsername("");
-      return false;
     }
   }
 
   useEffect(() => {
     let mounted = true;
 
-    supabase.auth.getSession().then(({ data }) => {
+    async function initialize() {
+      const { data } = await supabase.auth.getSession();
+
+      if (!mounted) return;
+
+      setSession(data.session);
+
+      if (!data.session) {
+        await loadUserConfigs();
+      }
+
       if (mounted) {
-        setSession(data.session);
         setAuthReady(true);
       }
-    });
+    }
 
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, currentSession) => {
-        if (mounted) {
-          setSession(currentSession);
-          setAuthReady(true);
-        }
-      }
-    );
+    initialize();
+
+    const {
+      data: { subscription: authSubscription },
+    } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession);
+    });
 
     return () => {
       mounted = false;
-      listener.subscription.unsubscribe();
+      authSubscription.unsubscribe();
     };
   }, []);
 
@@ -299,39 +190,31 @@ export default function Home() {
       setUsers([]);
       loadUserConfigs();
     }
-  }, [authReady, session]);
+  }, [session, authReady]);
 
   async function adminLogin() {
-    if (!email.trim() || !adminPassword) {
-      setMessage("ایمیل و رمز عبور مدیر را وارد کن");
-      return;
-    }
-
     setLoading(true);
     setMessage("");
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password: adminPassword,
-    });
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password: adminPassword,
+      });
 
-    setLoading(false);
+      if (error) throw error;
 
-    if (error) {
-      setMessage("ورود مدیر ناموفق بود");
-      return;
+      setSession(data.session);
+      setAdminPassword("");
+      setMessage("ورود مدیر موفق بود");
+    } catch (error: any) {
+      setMessage(error.message || "ورود مدیر ناموفق بود");
+    } finally {
+      setLoading(false);
     }
-
-    setSession(data.session);
-    setMessage("ورود مدیر موفق بود");
   }
 
   async function userLogin() {
-    if (!username.trim() || !userPassword) {
-      setMessage("نام کاربری و رمز عبور را وارد کن");
-      return;
-    }
-
     setLoading(true);
     setMessage("");
 
@@ -340,47 +223,48 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          username: username.trim(),
+          username,
           password: userPassword,
         }),
       });
 
-      const result = await response.json();
+      const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        setMessage(result.error || "ورود ناموفق بود");
-        setLoading(false);
-        return;
+        throw new Error(data.error || data.message || "ورود ناموفق بود");
       }
 
       setUserPassword("");
-      const loaded = await loadUserConfigs();
-
-      if (loaded) {
-        setMessage("ورود موفق بود");
-      } else {
-        setMessage("ورود انجام شد، اما دریافت اطلاعات حساب ممکن نشد");
-      }
-    } catch {
-      setMessage("خطا در ارتباط با سرور");
+      await loadUserConfigs();
+      setMessage("ورود کاربر موفق بود");
+    } catch (error: any) {
+      setMessage(error.message || "ورود ناموفق بود");
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   }
 
   async function logout() {
-    if (session) {
-      await supabase.auth.signOut();
-      setSession(null);
-    } else {
-      await fetch("/api/user/logout", { method: "POST" });
-      setUserMode(false);
-      setUserConfigs([]);
-      setSubscription(null);
-      setLoggedInUsername("");
-    }
+    setLoading(true);
 
-    setMessage("از حساب خارج شدی");
+    try {
+      if (session) {
+        await supabase.auth.signOut();
+        setSession(null);
+      } else {
+        await fetch("/api/user/logout", { method: "POST" });
+        setUserMode(false);
+        setUserConfigs([]);
+        setSubscription(null);
+        setLoggedInUsername("");
+      }
+
+      setMessage("با موفقیت خارج شدید");
+    } catch {
+      setMessage("خطا هنگام خروج");
+    } finally {
+      setLoading(false);
+    }
   }
 
   function resetForm() {
@@ -395,132 +279,121 @@ export default function Home() {
     setType(item.type);
     setConfig(item.config);
     setEditingId(item.id);
-    setMessage("در حال ویرایش: " + item.name);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   async function saveConfig() {
     if (!name.trim() || !config.trim()) {
-      setMessage("نام و متن کانفیگ را وارد کن");
+      setMessage("نام و متن کانفیگ را وارد کنید");
       return;
     }
 
     setLoading(true);
+    setMessage("");
 
-    if (editingId !== null) {
-      const { error } = await supabase
-        .from("vpn_configs")
-        .update({
-          name: name.trim(),
-          type,
-          config: config.trim(),
-        })
-        .eq("id", editingId);
+    try {
+      let result;
 
-      if (error) {
-        setLoading(false);
-        setMessage("خطا در ویرایش: " + error.message);
-        return;
+      if (editingId !== null) {
+        result = await supabase
+          .from("vpn_configs")
+          .update({ name, type, config })
+          .eq("id", editingId);
+      } else {
+        result = await supabase
+          .from("vpn_configs")
+          .insert([{ name, type, config, active: true }]);
       }
 
-      setMessage("تغییرات ذخیره شد");
-    } else {
-      const { error } = await supabase.from("vpn_configs").insert({
-        name: name.trim(),
-        type,
-        config: config.trim(),
-        active: true,
-      });
+      if (result.error) throw result.error;
 
-      if (error) {
-        setLoading(false);
-        setMessage("خطا در افزودن: " + error.message);
-        return;
-      }
-
-      setMessage("کانفیگ اضافه شد");
+      resetForm();
+      await loadConfigs();
+      setMessage("کانفیگ با موفقیت ذخیره شد");
+    } catch (error: any) {
+      setMessage(error.message || "خطا در ذخیره کانفیگ");
+    } finally {
+      setLoading(false);
     }
-
-    resetForm();
-    await loadConfigs();
-    setLoading(false);
   }
 
   async function toggleConfig(item: VpnConfig) {
-    const { error } = await supabase
-      .from("vpn_configs")
-      .update({ active: !item.active })
-      .eq("id", item.id);
+    setLoading(true);
 
-    if (error) {
-      setMessage("خطا در تغییر وضعیت: " + error.message);
-      return;
+    try {
+      const { error } = await supabase
+        .from("vpn_configs")
+        .update({ active: !item.active })
+        .eq("id", item.id);
+
+      if (error) throw error;
+
+      await loadConfigs();
+      setMessage("وضعیت کانفیگ تغییر کرد");
+    } catch (error: any) {
+      setMessage(error.message || "خطا در تغییر وضعیت کانفیگ");
+    } finally {
+      setLoading(false);
     }
-
-    setConfigs((previous) =>
-      previous.map((current) =>
-        current.id === item.id
-          ? { ...current, active: !item.active }
-          : current
-      )
-    );
   }
 
   async function deleteConfig(id: string | number) {
-    if (!window.confirm("این کانفیگ حذف شود؟")) return;
+    if (!window.confirm("از حذف این کانفیگ مطمئن هستید؟")) return;
 
-    const { error } = await supabase
-      .from("vpn_configs")
-      .delete()
-      .eq("id", id);
+    setLoading(true);
 
-    if (error) {
-      setMessage("خطا در حذف: " + error.message);
-      return;
+    try {
+      const { error } = await supabase
+        .from("vpn_configs")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+
+      if (editingId === id) resetForm();
+
+      await loadConfigs();
+      setMessage("کانفیگ حذف شد");
+    } catch (error: any) {
+      setMessage(error.message || "خطا در حذف کانفیگ");
+    } finally {
+      setLoading(false);
     }
-
-    if (editingId === id) resetForm();
-
-    setMessage("کانفیگ حذف شد");
-    await loadConfigs();
   }
 
   async function createUser() {
-    if (!newUsername.trim() || !newUserPassword) {
-      setMessage("نام کاربری و رمز عبور کاربر را وارد کن");
+    if (!newUsername.trim() || !newUserPassword.trim()) {
+      setMessage("نام کاربری و رمز عبور را وارد کنید");
       return;
     }
 
     setLoading(true);
 
     try {
-      const response = await adminFetch("/api/admin/users", {
+      await adminFetch("/api/admin/users", {
         method: "POST",
         body: JSON.stringify({
-          username: newUsername.trim(),
+          username: newUsername,
           password: newUserPassword,
         }),
       });
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        setMessage(result.error || "ساخت کاربر انجام نشد");
-      } else {
-        setMessage("کاربر ساخته شد");
-        setNewUsername("");
-        setNewUserPassword("");
-        await loadUsers();
-      }
-    } catch {
-      setMessage("خطا در ساخت کاربر");
+      setNewUsername("");
+      setNewUserPassword("");
+      await loadUsers();
+      setMessage("کاربر ساخته شد");
+    } catch (error: any) {
+      setMessage(error.message || "خطا در ساخت کاربر");
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   }
 
   async function toggleUser(user: VpnUser) {
+    setLoading(true);
+
     try {
-      const response = await adminFetch("/api/admin/users", {
+      await adminFetch("/api/admin/users", {
         method: "PATCH",
         body: JSON.stringify({
           id: user.id,
@@ -528,43 +401,33 @@ export default function Home() {
         }),
       });
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        setMessage(result.error || "تغییر وضعیت کاربر انجام نشد");
-        return;
-      }
-
-      setMessage(user.active ? "کاربر مسدود شد" : "کاربر فعال شد");
       await loadUsers();
-    } catch {
-      setMessage("خطا در تغییر وضعیت کاربر");
+      setMessage("وضعیت کاربر تغییر کرد");
+    } catch (error: any) {
+      setMessage(error.message || "خطا در تغییر وضعیت کاربر");
+    } finally {
+      setLoading(false);
     }
   }
 
   async function changeUserPassword(user: VpnUser) {
-    const newPassword = passwordChanges[user.id] || "";
+    const password = passwordChanges[user.id];
 
-    if (newPassword.length < 8) {
-      setMessage("رمز جدید باید حداقل ۸ کاراکتر باشد");
+    if (!password || password.length < 6) {
+      setMessage("رمز جدید باید حداقل ۶ کاراکتر باشد");
       return;
     }
 
+    setLoading(true);
+
     try {
-      const response = await adminFetch("/api/admin/users", {
+      await adminFetch("/api/admin/users", {
         method: "PATCH",
         body: JSON.stringify({
           id: user.id,
-          password: newPassword,
+          password,
         }),
       });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        setMessage(result.error || "تغییر رمز انجام نشد");
-        return;
-      }
 
       setPasswordChanges((previous) => ({
         ...previous,
@@ -572,65 +435,89 @@ export default function Home() {
       }));
 
       setMessage("رمز عبور تغییر کرد");
-    } catch {
-      setMessage("خطا در تغییر رمز عبور");
+    } catch (error: any) {
+      setMessage(error.message || "خطا در تغییر رمز عبور");
+    } finally {
+      setLoading(false);
     }
   }
 
   async function deleteUser(user: VpnUser) {
     if (!window.confirm(`کاربر ${user.username} حذف شود؟`)) return;
 
+    setLoading(true);
+
     try {
-      const response = await adminFetch("/api/admin/users", {
+      await adminFetch("/api/admin/users", {
         method: "DELETE",
         body: JSON.stringify({ id: user.id }),
       });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        setMessage(result.error || "حذف کاربر انجام نشد");
-        return;
-      }
 
       if (selectedUser?.id === user.id) {
         setSelectedUser(null);
         setAssignedConfigIds([]);
       }
 
-      setMessage("کاربر حذف شد");
       await loadUsers();
-    } catch {
-      setMessage("خطا در حذف کاربر");
+      setMessage("کاربر حذف شد");
+    } catch (error: any) {
+      setMessage(error.message || "خطا در حذف کاربر");
+    } finally {
+      setLoading(false);
     }
+  }
+
+  function toDateInput(value?: string | null) {
+    if (!value) return "";
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) return "";
+
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  }
+
+  function formatDate(value?: string | null) {
+    if (!value) return "ثبت نشده";
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) return "نامشخص";
+
+    return date.toLocaleDateString("fa-IR");
   }
 
   async function openAssignments(user: VpnUser) {
     setSelectedUser(user);
-    setAssignedConfigIds([]);
-
     setPlanStart(toDateInput(user.plan_start));
     setPlanExpiry(toDateInput(user.plan_expires_at));
     setTotalGb(user.total_gb == null ? "" : String(user.total_gb));
-    setUsedGb(String(user.used_gb || 0));
+    setUsedGb(String(user.used_gb ?? 0));
+    setAssignedConfigIds([]);
+
+    setLoading(true);
 
     try {
-      const response = await adminFetch(
+      const data = await adminFetch(
         `/api/admin/users/${user.id}/configs`
       );
 
-      const result = await response.json();
+      const ids =
+        data.configIds ||
+        data.config_ids ||
+        (data.configs || []).map((item: any) =>
+          String(item.config_id ?? item.id)
+        );
 
-      if (!response.ok) {
-        setMessage(result.error || "خطا در دریافت دسترسی‌ها");
-        return;
-      }
-
-      setAssignedConfigIds(
-        (result.configIds || []).map((id: string | number) => String(id))
-      );
-    } catch {
-      setMessage("خطا در دریافت کانفیگ‌های کاربر");
+      setAssignedConfigIds(ids.map((id: any) => String(id)));
+    } catch (error: any) {
+      setMessage(error.message || "خطا در دریافت کانفیگ‌های کاربر");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -640,21 +527,16 @@ export default function Home() {
     const id = String(configId);
     const alreadyAssigned = assignedConfigIds.includes(id);
 
+    setLoading(true);
+
     try {
-      const response = await adminFetch(
+      await adminFetch(
         `/api/admin/users/${selectedUser.id}/configs`,
         {
           method: alreadyAssigned ? "DELETE" : "POST",
-          body: JSON.stringify({ configId: id }),
+          body: JSON.stringify({ config_id: id }),
         }
       );
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        setMessage(result.error || "تغییر دسترسی انجام نشد");
-        return;
-      }
 
       setAssignedConfigIds((previous) =>
         alreadyAssigned
@@ -664,11 +546,13 @@ export default function Home() {
 
       setMessage(
         alreadyAssigned
-          ? "دسترسی کانفیگ برداشته شد"
+          ? "کانفیگ از کاربر گرفته شد"
           : "کانفیگ به کاربر اختصاص داده شد"
       );
-    } catch {
-      setMessage("خطا در تغییر دسترسی کانفیگ");
+    } catch (error: any) {
+      setMessage(error.message || "خطا در تغییر دسترسی کانفیگ");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -679,54 +563,40 @@ export default function Home() {
     const used = Number(usedGb);
 
     if (total !== null && (!Number.isFinite(total) || total < 0)) {
-      setMessage("حجم کل باید عدد صفر یا بیشتر باشد");
+      setMessage("حجم کل باید عددی معتبر و صفر یا بیشتر باشد");
       return;
     }
 
     if (!Number.isFinite(used) || used < 0) {
-      setMessage("حجم مصرف‌شده نامعتبر است");
-      return;
-    }
-
-    const startIso = planStart
-      ? new Date(planStart).toISOString()
-      : null;
-    const expiryIso = planExpiry
-      ? new Date(planExpiry).toISOString()
-      : null;
-
-    if (startIso && expiryIso && new Date(expiryIso) <= new Date(startIso)) {
-      setMessage("تاریخ انقضا باید بعد از تاریخ شروع باشد");
+      setMessage("حجم مصرف‌شده معتبر نیست");
       return;
     }
 
     setLoading(true);
 
     try {
-      const response = await adminFetch("/api/admin/users", {
+      await adminFetch("/api/admin/users", {
         method: "PATCH",
         body: JSON.stringify({
           id: selectedUser.id,
-          plan_start: startIso,
-          plan_expires_at: expiryIso,
+          plan_start: planStart
+            ? new Date(`${planStart}T00:00:00`).toISOString()
+            : null,
+          plan_expires_at: planExpiry
+            ? new Date(`${planExpiry}T23:59:59`).toISOString()
+            : null,
           total_gb: total,
           used_gb: used,
         }),
       });
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        setMessage(result.error || "ذخیره اشتراک انجام نشد");
-      } else {
-        setMessage("اطلاعات اشتراک ذخیره شد");
-        await loadUsers();
-      }
-    } catch {
-      setMessage("خطا در ذخیره اشتراک");
+      await loadUsers();
+      setMessage("اشتراک ذخیره شد");
+    } catch (error: any) {
+      setMessage(error.message || "خطا در ذخیره اشتراک");
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   }
 
   async function renewSubscription() {
@@ -734,49 +604,45 @@ export default function Home() {
 
     const days = Number(renewDays);
 
-    if (!Number.isInteger(days) || days < 1 || days > 3650) {
-      setMessage("مدت تمدید باید بین ۱ تا ۳۶۵۰ روز باشد");
+    if (!Number.isInteger(days) || days < 1) {
+      setMessage("تعداد روز تمدید باید حداقل یک روز باشد");
       return;
     }
+
+    const currentExpiry = selectedUser.plan_expires_at
+      ? new Date(selectedUser.plan_expires_at)
+      : new Date();
 
     const now = new Date();
-    const expiry = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
-    const used = resetUsage ? 0 : Number(usedGb);
-
-    if (!Number.isFinite(used) || used < 0) {
-      setMessage("حجم مصرف‌شده نامعتبر است");
-      return;
-    }
+    const startDate = currentExpiry > now ? currentExpiry : now;
+    const newExpiry = new Date(startDate);
+    newExpiry.setDate(newExpiry.getDate() + days);
 
     setLoading(true);
 
     try {
-      const response = await adminFetch("/api/admin/users", {
+      await adminFetch("/api/admin/users", {
         method: "PATCH",
         body: JSON.stringify({
           id: selectedUser.id,
-          plan_start: now.toISOString(),
-          plan_expires_at: expiry.toISOString(),
-          used_gb: used,
+          plan_start: selectedUser.plan_start || now.toISOString(),
+          plan_expires_at: newExpiry.toISOString(),
+          ...(resetUsage ? { used_gb: 0 } : {}),
         }),
       });
 
-      const result = await response.json();
+      setPlanStart(toDateInput(selectedUser.plan_start || now.toISOString()));
+      setPlanExpiry(toDateInput(newExpiry.toISOString()));
 
-      if (!response.ok) {
-        setMessage(result.error || "تمدید اشتراک انجام نشد");
-      } else {
-        setPlanStart(toDateInput(now.toISOString()));
-        setPlanExpiry(toDateInput(expiry.toISOString()));
-        setUsedGb(String(used));
-        setMessage(`اشتراک برای ${days} روز تمدید شد`);
-        await loadUsers();
-      }
-    } catch {
-      setMessage("خطا در تمدید اشتراک");
+      if (resetUsage) setUsedGb("0");
+
+      await loadUsers();
+      setMessage("اشتراک تمدید شد");
+    } catch (error: any) {
+      setMessage(error.message || "خطا در تمدید اشتراک");
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   }
 
   async function copyConfig(value: string) {
@@ -784,7 +650,7 @@ export default function Home() {
       await navigator.clipboard.writeText(value);
       setMessage("کانفیگ کپی شد");
     } catch {
-      setMessage("کپی انجام نشد");
+      setMessage("کپی انجام نشد؛ متن را دستی انتخاب کنید");
     }
   }
 
@@ -803,105 +669,482 @@ export default function Home() {
     <main dir="rtl">
       <div className="container">
         <h1>VPN Hub</h1>
+        <p>پنل مدیریت و ارائه کانفیگ VPN</p>
 
-        <section className="panel">
-          <h2>مدیریت کانفیگ‌ها</h2>
-
-          <form onSubmit={saveConfig}>
-            <input
-              placeholder="نام کانفیگ"
-              value={configName}
-              onChange={(e) => setConfigName(e.target.value)}
-            />
-            <input
-              placeholder="نوع کانفیگ"
-              value={configType}
-              onChange={(e) => setConfigType(e.target.value)}
-            />
-            <textarea
-              placeholder="متن کانفیگ"
-              value={configText}
-              onChange={(e) => setConfigText(e.target.value)}
-            />
-            <button type="submit">
-              {editingConfig ? "ذخیره تغییرات" : "افزودن کانفیگ"}
+        {message && (
+          <div className="panel">
+            <p>{message}</p>
+            <button type="button" onClick={() => setMessage("")}>
+              بستن پیام
             </button>
-            {editingConfig && (
-              <button type="button" onClick={cancelEditConfig}>
-                انصراف
-              </button>
-            )}
-          </form>
-                    {configs.map((config) => (
-            <div className="config-item" key={config.id}>
-              <div>
-                <strong>{config.name}</strong>
-                <p>{config.type}</p>
+          </div>
+        )}
+
+        {!session && !userMode && (
+          <>
+            <section className="panel">
+              <h2>ورود مدیر</h2>
+
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  adminLogin();
+                }}
+              >
+                <input
+                  type="email"
+                  placeholder="ایمیل مدیر"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  required
+                />
+
+                <input
+                  type="password"
+                  placeholder="رمز عبور مدیر"
+                  value={adminPassword}
+                  onChange={(event) =>
+                    setAdminPassword(event.target.value)
+                  }
+                  required
+                />
+
+                <button type="submit" disabled={loading}>
+                  ورود مدیر
+                </button>
+              </form>
+            </section>
+
+            <section className="panel">
+              <h2>ورود کاربر</h2>
+
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  userLogin();
+                }}
+              >
+                <input
+                  type="text"
+                  placeholder="نام کاربری"
+                  value={username}
+                  onChange={(event) => setUsername(event.target.value)}
+                  required
+                />
+
+                <input
+                  type="password"
+                  placeholder="رمز عبور"
+                  value={userPassword}
+                  onChange={(event) =>
+                    setUserPassword(event.target.value)
+                  }
+                  required
+                />
+
+                <button type="submit" disabled={loading}>
+                  ورود کاربر
+                </button>
+              </form>
+            </section>
+          </>
+        )}
+
+        {userMode && !session && (
+          <section className="panel">
+            <h2>سلام {loggedInUsername}</h2>
+            <h3>وضعیت اشتراک</h3>
+
+            {subscription ? (
+              <>
+                <p>شروع اشتراک: {formatDate(subscription.plan_start)}</p>
+                <p>پایان اشتراک: {formatDate(subscription.plan_expires_at)}</p>
                 <p>
-                  وضعیت: {config.active ? "فعال" : "غیرفعال"}
+                  حجم کل:{" "}
+                  {subscription.total_gb == null
+                    ? "نامحدود"
+                    : `${subscription.total_gb} گیگابایت`}
                 </p>
-              </div>
+                <p>حجم مصرف‌شده: {subscription.used_gb} گیگابایت</p>
+                <p>
+                  حجم باقی‌مانده:{" "}
+                  {subscription.remaining_gb == null
+                    ? "نامحدود"
+                    : `${subscription.remaining_gb} گیگابایت`}
+                </p>
+              </>
+            ) : (
+              <p>اطلاعات اشتراک در دسترس نیست.</p>
+            )}
 
-              <div className="actions">
-                <button
-                  type="button"
-                  onClick={() => editConfig(config)}
+            <h3>کانفیگ‌های من</h3>
+
+            {userConfigs.length === 0 ? (
+              <p>هنوز کانفیگی برای شما ثبت نشده است.</p>
+            ) : (
+              userConfigs.map((item) => (
+                <div className="panel" key={item.id}>
+                  <h3>{item.name}</h3>
+                  <p>نوع:
+                    {item.type}</p>
+                  <textarea
+                    readOnly
+                    value={item.config}
+                    rows={4}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => copyConfig(item.config)}
+                  >
+                    کپی کانفیگ
+                  </button>
+                </div>
+              ))
+            )}
+
+            <button type="button" onClick={logout} disabled={loading}>
+              خروج از حساب
+            </button>
+          </section>
+        )}
+
+        {session && (
+          <>
+            <section className="panel">
+              <h2>مدیریت کانفیگ‌ها</h2>
+
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  saveConfig();
+                }}
+              >
+                <input
+                  type="text"
+                  placeholder="نام کانفیگ"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  required
+                />
+
+                <select
+                  value={type}
+                  onChange={(event) => setType(event.target.value)}
                 >
-                  ویرایش
+                  <option value="VLESS">VLESS</option>
+                  <option value="VMESS">VMESS</option>
+                  <option value="Trojan">Trojan</option>
+                  <option value="Shadowsocks">Shadowsocks</option>
+                  <option value="WireGuard">WireGuard</option>
+                  <option value="Other">سایر</option>
+                </select>
+
+                <textarea
+                  placeholder="متن کامل کانفیگ"
+                  value={config}
+                  onChange={(event) => setConfig(event.target.value)}
+                  rows={5}
+                  required
+                />
+
+                <button type="submit" disabled={loading}>
+                  {editingId !== null
+                    ? "ذخیره تغییرات"
+                    : "افزودن کانفیگ"}
                 </button>
 
+                {editingId !== null && (
+                  <button type="button" onClick={resetForm}>
+                    انصراف از ویرایش
+                  </button>
+                )}
+              </form>
+
+              <h3>کانفیگ‌های فعال ({activeConfigs.length})</h3>
+
+              {activeConfigs.map((item) => (
+                <div className="panel" key={item.id}>
+                  <h3>{item.name}</h3>
+                  <p>نوع: {item.type}</p>
+                  <textarea readOnly value={item.config} rows={3} />
+
+                  <button
+                    type="button"
+                    onClick={() => copyConfig(item.config)}
+                  >
+                    کپی
+                  </button>
+                  <button type="button" onClick={() => startEdit(item)}>
+                    ویرایش
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => toggleConfig(item)}
+                  >
+                    غیرفعال کردن
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => deleteConfig(item.id)}
+                  >
+                    حذف
+                  </button>
+                </div>
+              ))}
+
+              <h3>کانفیگ‌های غیرفعال ({inactiveConfigs.length})</h3>
+
+              {inactiveConfigs.map((item) => (
+                <div className="panel" key={item.id}>
+                  <h3>{item.name}</h3>
+                  <p>نوع: {item.type}</p>
+
+                  <button type="button" onClick={() => startEdit(item)}>
+                    ویرایش
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => toggleConfig(item)}
+                  >
+                    فعال کردن
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => deleteConfig(item.id)}
+                  >
+                    حذف
+                  </button>
+                </div>
+              ))}
+            </section>
+
+            <section className="panel">
+              <h2>مدیریت کاربران</h2>
+
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  createUser();
+                }}
+              >
+                <input
+                  type="text"
+                  placeholder="نام کاربری جدید"
+                  value={newUsername}
+                  onChange={(event) =>
+                    setNewUsername(event.target.value)
+                  }
+                  required
+                />
+
+                <input
+                  type="password"
+                  placeholder="رمز عبور جدید"
+                  value={newUserPassword}
+                  onChange={(event) =>
+                    setNewUserPassword(event.target.value)
+                  }
+                  required
+                />
+
+                <button type="submit" disabled={loading}>
+                  ساخت کاربر
+                </button>
+              </form>
+
+              <h3>فهرست کاربران ({users.length})</h3>
+
+              {users.map((user) => (
+                <div className="panel" key={user.id}>
+                  <h3>{user.username}</h3>
+                  <p>
+                    وضعیت: {user.active ? "فعال" : "غیرفعال"}
+                  </p>
+                  <p>
+                    شروع اشتراک: {formatDate(user.plan_start)}
+                  </p>
+                  <p>
+                    پایان اشتراک: {formatDate(user.plan_expires_at)}
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={() => openAssignments(user)}
+                  >
+                    مدیریت اشتراک و کانفیگ‌ها
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => toggleUser(user)}
+                  >
+                    {user.active ? "غیرفعال کردن" : "فعال کردن"}
+                  </button>
+
+                  <input
+                    type="password"
+                    placeholder="رمز عبور جدید"
+                    value={passwordChanges[user.id] || ""}
+                    onChange={(event) =>
+                      setPasswordChanges((previous) => ({
+                        ...previous,
+                        [user.id]: event.target.value,
+                      }))
+                    }
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => changeUserPassword(user)}
+                  >
+                    تغییر رمز
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => deleteUser(user)}
+                  >
+                    حذف کاربر
+                  </button>
+                </div>
+              ))}
+            </section>
+
+            {selectedUser && (
+              <section className="panel">
+                <h2>مدیریت کاربر: {selectedUser.username}</h2>
+
+                <h3>تنظیم اشتراک</h3>
+
+                <label>تاریخ شروع اشتراک</label>
+                <input
+                  type="date"
+                  value={planStart}
+                  onChange={(event) => setPlanStart(event.target.value)}
+                />
+
+                <label>تاریخ پایان اشتراک</label>
+                <input
+                  type="date"
+                  value={planExpiry}
+                  onChange={(event) => setPlanExpiry(event.target.value)}
+                />
+
+                <label>حجم کل به گیگابایت (خالی = نامحدود)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  placeholder="مثلاً 100"
+                  value={totalGb}
+                  onChange={(event) => setTotalGb(event.target.value)}
+                />
+
+                <label>حجم مصرف‌شده به گیگابایت</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value={usedGb}
+                  onChange={(event) => setUsedGb(event.target.value)}
+                />
+
                 <button
                   type="button"
-                  onClick={() => toggleConfig(config)}
+                  onClick={saveSubscription}
+                  disabled={loading}
                 >
-                  {config.active ? "غیرفعال کردن" : "فعال کردن"}
+                  ذخیره اشتراک
                 </button>
+
+                <h3>تمدید اشتراک</h3>
+
+                <label>تعداد روز تمدید</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={renewDays}
+                  onChange={(event) => setRenewDays(event.target.value)}
+                />
+
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={resetUsage}
+                    onChange={(event) =>
+                      setResetUsage(event.target.checked)
+                    }
+                  />
+                  صفر کردن حجم مصرف‌شده
+                </label>
 
                 <button
                   type="button"
-                  onClick={() => deleteConfig(config)}
+                  onClick={renewSubscription}
+                  disabled={loading}
                 >
-                  حذف
+                  تمدید اشتراک
                 </button>
-              </div>
 
-              <textarea readOnly value={config.config} />
+                <h3>اختصاص کانفیگ به کاربر</h3>
 
-              <h4>اختصاص به کاربر</h4>
+                {configs.length === 0 ? (
+                  <p>هنوز کانفیگی ثبت نشده است.</p>
+                ) : (
+                  configs.map((item) => {
+                    const assigned = assignedConfigIds.includes(
+                      String(item.id)
+                    );
 
-              {users.map((user) => {
-                const assigned = assignedConfigs[user.id]?.includes(
-                  config.id
-                );
+                    return (
+                      <div className="panel" key={item.id}>
+                        <p>
+                          {item.name} ({item.type})
+                        </p>
+                        <p>
+                          وضعیت کانفیگ:{" "}
+                          {item.active ? "فعال" : "غیرفعال"}
+                        </p>
 
-                return (
-                  <div className="assignment-row" key={user.id}>
-                    <span>{user.username}</span>
+                        <button
+                          type="button"
+                          onClick={() => toggleAssignment(item.id)}
+                          disabled={loading}
+                        >
+                          {assigned
+                            ? "حذف دسترسی کاربر"
+                            : "اختصاص به کاربر"}
+                        </button>
+                      </div>
+                    );
+                  })
+                )}
 
-                    <button
-                      type="button"
-                      onClick={() =>
-                        toggleAssignment(
-                          user.id,
-                          config.id,
-                          !!assigned
-                        )
-                      }
-                    >
-                      {assigned ? "حذف دسترسی" : "اختصاص کانفیگ"}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          ))}
-        </section>
-                <button type="button" onClick={adminLogout}>
-          خروج مدیر
-        </button>
-      </>
-    )}
-  </div>
-</main>
-);
-}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedUser(null);
+                    setAssignedConfigIds([]);
+                  }}
+                >
+                  بستن مدیریت کاربر
+                </button>
+              </section>
+            )}
+
+            <section className="panel">
+              <button
+                type="button"
+                onClick={logout}
+                disabled={loading}
+              >
+                خروج مدیر
+              </button>
+            </section>
+          </>
+        )}
+      </div>
+    </main>
+  );
+                  }
+                  

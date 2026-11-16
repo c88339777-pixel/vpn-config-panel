@@ -20,6 +20,11 @@ import {
   Plus,
   Check,
   Search,
+  CheckCircle2,
+  AlertCircle,
+  Activity,
+  Gauge,
+  CalendarClock,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
@@ -90,6 +95,7 @@ export default function Home() {
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [copyToast, setCopyToast] = useState<"success" | "error" | null>(null);
   const [userMode, setUserMode] = useState(false);
   const activeConfigs = configs.filter((item) => item.active);
   const inactiveConfigs = configs.filter((item) => !item.active);
@@ -108,6 +114,22 @@ export default function Home() {
       (userFilter === "subscription-expired" && status.className === "subscription-expired");
     return matchesSearch && matchesFilter;
   });
+
+  const activeUserCount = users.filter((user) => user.active).length;
+  const expiringUserCount = users.filter(
+    (user) => getSubscriptionStatus(user.plan_expires_at).className === "subscription-warning"
+  ).length;
+  const expiredUserCount = users.filter(
+    (user) => getSubscriptionStatus(user.plan_expires_at).className === "subscription-expired"
+  ).length;
+  const subscriptionTotal = users.length || 1;
+  const activeSubscriptionCount = users.filter((user) => {
+    const status = getSubscriptionStatus(user.plan_expires_at).className;
+    return status === "subscription-active" || status === "subscription-warning";
+  }).length;
+  const usagePercent = subscription?.total_gb
+    ? Math.min(100, Math.max(0, (subscription.used_gb / subscription.total_gb) * 100))
+    : 0;
 
   async function adminFetch(url: string, options: RequestInit = {}) {
     if (!session?.access_token) {
@@ -722,12 +744,32 @@ export default function Home() {
 
   async function copyConfig(value: string) {
     try {
-      await navigator.clipboard.writeText(value);
-      setMessage("کانفیگ کپی شد");
+      if (navigator.clipboard?.writeText && window.isSecureContext) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        const temporary = document.createElement("textarea");
+        temporary.value = value;
+        temporary.setAttribute("readonly", "");
+        temporary.style.position = "fixed";
+        temporary.style.opacity = "0";
+        temporary.style.pointerEvents = "none";
+        document.body.appendChild(temporary);
+        temporary.select();
+        const copied = document.execCommand("copy");
+        document.body.removeChild(temporary);
+        if (!copied) throw new Error("copy_failed");
+      }
+      setCopyToast("success");
     } catch {
-      setMessage("کپی انجام نشد؛ متن را دستی انتخاب کنید");
+      setCopyToast("error");
     }
   }
+
+  useEffect(() => {
+    if (!copyToast) return;
+    const timeout = window.setTimeout(() => setCopyToast(null), 2600);
+    return () => window.clearTimeout(timeout);
+  }, [copyToast]);
 
   if (!authReady) {
     return (
@@ -742,6 +784,16 @@ export default function Home() {
 
   return (
     <main dir="rtl">
+      {copyToast && (
+        <div
+          className={`copy-toast ${copyToast === "success" ? "copy-toast-success" : "copy-toast-error"}`}
+          role="status"
+          aria-live="polite"
+        >
+          {copyToast === "success" ? <CheckCircle2 size={21} /> : <AlertCircle size={21} />}
+          <span>{copyToast === "success" ? "کانفیگ با موفقیت کپی شد" : "کپی کانفیگ انجام نشد؛ دوباره تلاش کنید"}</span>
+        </div>
+      )}
       <div className="container">
         <h1>VPN Hub</h1>
         <p>پنل مدیریت و ارائه کانفیگ VPN</p>
@@ -830,62 +882,94 @@ export default function Home() {
         )}
 
         {userMode && !session && (
-          <section className="panel">
-            <h2><UserRound size={20} /> سلام {loggedInUsername}</h2>
-            <h3><CalendarDays size={18} /> وضعیت اشتراک</h3>
+          <section className="user-home">
+            <div className="user-welcome-card">
+              <div className="user-welcome-icon"><UserRound size={25} /></div>
+              <div>
+                <span className="eyebrow">پنل اختصاصی شما</span>
+                <h2>سلام {loggedInUsername}</h2>
+                <p>وضعیت سرویس و کانفیگ‌های شما در یک نگاه</p>
+              </div>
+            </div>
 
-            {subscription ? (
-              <>
-                <p>شروع اشتراک: {formatDate(subscription.plan_start)}</p>
-                <p>پایان اشتراک: {formatDate(subscription.plan_expires_at)}</p>
-                <p>
-                  حجم کل:{" "}
-                  {subscription.total_gb == null
-                    ? "نامحدود"
-                    : `${subscription.total_gb} گیگابایت`}
-                </p>
-                <p>حجم مصرف‌شده: {subscription.used_gb} گیگابایت</p>
-                <p>
-                  حجم باقی‌مانده:{" "}
-                  {subscription.remaining_gb == null
-                    ? "نامحدود"
-                    : `${subscription.remaining_gb} گیگابایت`}
-                </p>
-              </>
-            ) : (
-              <p>اطلاعات اشتراک در دسترس نیست.</p>
-            )}
+            <section className="panel user-subscription-panel">
+              <h2><CalendarDays size={20} /> وضعیت اشتراک</h2>
+              {subscription ? (
+                <>
+                  <div className="user-summary-grid">
+                    <div className="user-summary-item">
+                      <span>وضعیت اشتراک</span>
+                      <strong className={`status-badge ${getSubscriptionStatus(subscription.plan_expires_at).className}`}>
+                        {getSubscriptionStatus(subscription.plan_expires_at).label}
+                      </strong>
+                    </div>
+                    <div className="user-summary-item">
+                      <span>پایان اشتراک</span>
+                      <strong>{formatDate(subscription.plan_expires_at)}</strong>
+                    </div>
+                    <div className="user-summary-item">
+                      <span>حجم باقی‌مانده</span>
+                      <strong>{subscription.remaining_gb == null ? "نامحدود" : `${subscription.remaining_gb} گیگابایت`}</strong>
+                    </div>
+                  </div>
+                  <div className="user-subscription-dates">
+                    <div><span>شروع اشتراک</span><strong>{formatDate(subscription.plan_start)}</strong></div>
+                    <div><span>حجم کل</span><strong>{subscription.total_gb == null ? "نامحدود" : `${subscription.total_gb} گیگابایت`}</strong></div>
+                    <div><span>مصرف‌شده</span><strong>{subscription.used_gb} گیگابایت</strong></div>
+                  </div>
+                  {subscription.total_gb != null && (
+                    <div className="usage-progress-wrap">
+                      <div className="usage-progress-heading">
+                        <span><Gauge size={16} /> میزان مصرف حجم</span>
+                        <strong>{Math.round(usagePercent)}٪</strong>
+                      </div>
+                      <div className="usage-progress-track">
+                        <div className="usage-progress-fill" style={{ width: `${usagePercent}%` }} />
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p>اطلاعات اشتراک در دسترس نیست.</p>
+              )}
+            </section>
 
-            <h3><Server size={18} /> کانفیگ‌های من</h3>
-
-            {userConfigs.length === 0 ? (
-              <p>هنوز کانفیگی برای شما ثبت نشده است.</p>
-            ) : (
-              userConfigs.map((item) => (
-                <div className="panel" key={item.id}>
-                  <h3>{item.name}</h3>
-                  <p>نوع: {item.type}</p>
-                  <textarea readOnly value={item.config} rows={4} />
-                  <button
-                    type="button"
-                    className="connect-config-button"
-                    onClick={() => copyConfig(item.config)}
-                    title="کپی کانفیگ برای واردکردن در برنامه VPN"
-                    aria-label="کپی کانفیگ"
-                  >
-                    <Copy size={18} />
-                    کپی کانفیگ
-                  </button>
+            <section className="panel user-configs-panel">
+              <div className="section-heading-row">
+                <h2><Server size={20} /> کانفیگ‌های من</h2>
+                <span className="count-pill">{userConfigs.length} کانفیگ</span>
+              </div>
+              {userConfigs.length === 0 ? (
+                <p className="message">هنوز کانفیگی برای شما ثبت نشده است.</p>
+              ) : (
+                <div className="user-config-grid">
+                  {userConfigs.map((item) => (
+                    <article className="user-config-card" key={item.id}>
+                      <div className="config-card-heading">
+                        <span className="config-type-icon"><Server size={19} /></span>
+                        <div>
+                          <h3>{item.name}</h3>
+                          <span>{item.type}</span>
+                        </div>
+                      </div>
+                      <textarea readOnly value={item.config} rows={4} aria-label={`کانفیگ ${item.name}`} />
+                      <button
+                        type="button"
+                        className="connect-config-button copy-config-button"
+                        onClick={() => copyConfig(item.config)}
+                        title="کپی کانفیگ برای واردکردن در برنامه VPN"
+                        aria-label="کپی کانفیگ"
+                      >
+                        <Copy size={18} />
+                        کپی کانفیگ
+                      </button>
+                    </article>
+                  ))}
                 </div>
-              ))
-            )}
+              )}
+            </section>
 
-            <button
-              type="button"
-              onClick={logout}
-              disabled={loading}
-              title="خروج از حساب"
-            >
+            <button type="button" onClick={logout} disabled={loading} title="خروج از حساب">
               <LogOut size={18} />
               خروج از حساب
             </button>
@@ -1078,7 +1162,24 @@ export default function Home() {
                     </strong>
                   </div>
                 </div>
-                <p className="stats-note">آمار به‌روز شده بر اساس اطلاعات فعلی پنل</p>
+                <p className="stats-note"><Activity size={14} /> آمار به‌روز شده بر اساس اطلاعات فعلی پنل</p>
+                <div className="dashboard-insights">
+                  <div className="dashboard-insight-heading">
+                    <strong>نمای کلی وضعیت کاربران</strong>
+                    <span>{users.length} کاربر</span>
+                  </div>
+                  <div className="dashboard-bar" aria-label="توزیع وضعیت اشتراک کاربران">
+                    <span className="dashboard-bar-active" style={{ width: `${(activeSubscriptionCount / subscriptionTotal) * 100}%` }} />
+                    <span className="dashboard-bar-warning" style={{ width: `${(expiringUserCount / subscriptionTotal) * 100}%` }} />
+                    <span className="dashboard-bar-expired" style={{ width: `${(expiredUserCount / subscriptionTotal) * 100}%` }} />
+                  </div>
+                  <div className="dashboard-legend">
+                    <span><i className="legend-dot dot-active" /> فعال: {Math.max(0, activeSubscriptionCount - expiringUserCount)}</span>
+                    <span><i className="legend-dot dot-warning" /> نزدیک انقضا: {expiringUserCount}</span>
+                    <span><i className="legend-dot dot-expired" /> منقضی: {expiredUserCount}</span>
+                    <span><i className="legend-dot dot-account" /> حساب فعال: {activeUserCount}</span>
+                  </div>
+                </div>
               </div>
 
               <form
@@ -1172,6 +1273,12 @@ export default function Home() {
                       <p className={`subscription-detail ${subscriptionStatus.className}`}>
                         {subscriptionStatus.detail}
                       </p>
+                      <div className="user-profile-extra">
+                        <div><span><CalendarClock size={15} /> عضویت از</span><strong>{formatDate(user.created_at)}</strong></div>
+                        {user.total_gb != null && (
+                          <div><span><Gauge size={15} /> مصرف حجم</span><strong>{user.used_gb || 0} از {user.total_gb} گیگابایت</strong></div>
+                        )}
+                      </div>
                     </div>
 
                     <div className="user-card-actions">

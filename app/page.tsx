@@ -542,5 +542,140 @@ export default function Home() {
       </div>
     </main>
   );
+}
+sName="config-card"
+                key={item.id}
+                style={{ marginBottom: "14px" }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "12px",
+                  }}
+                >
+                  <div>
+                    <strong>{item.name}</strong>
+                    <p>{item.type}</p>
+                  </div>
+
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={item.active}
+                    aria-label={item.active ? "غیرفعال کردن" : "فعال کردن"}
+                    title={item.active ? "غیرفعال کردن" : "فعال کردن"}
+                    onClick={() => toggleConfig(item)}
+                    style={{
+                      width: "42px",
+                      height: "24px",
+                      borderRadius: "999px",
+                      border: "none",
+                      padding: "3px",
+                      background: item.active ? "#20B65A" : "#777777",
+                      position: "relative",
+                      cursor: "pointer",
+                      flexShrink: 0,
+                      transition: "background 0.2s ease",
+                    }}
+                  >
+                    <span
+                      style={{
+                        position: "absolute",
+                        top: "3px",
+                        right: item.active ? "3px" : "21px",
+                        width: "18px",
+                        height: "18px",
+                        borderRadius: "50%",
+                        background: "#FFFFFF",
+                        boxShadow: "0 1px 3px #0004",
+                        transition: "right 0.2s ease",
+                      }}
+                    />
+                  </button>
+                </div>
+
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "flex-end",
+                    alignItems: "center",
+                    gap: "8px",
+                    marginTop: "14px",
+                  }}
+                >
+                  <button
+                    style={iconButton}
+                    title="کپی"
+                    aria-label="کپی"
+                    onClick={() => copyConfig(item.config)}
+                  >
+                    <Icon name="copy" />
+                  </button>
+
+                  <button
+                    style={iconButton}
+                    title="ویرایش"
+                    aria-label="ویرایش"
+                    onClick={() => startEdit(item)}
+                  >
+                    <Icon name="edit" />
+                  </button>
+
+                  <button
+                    style={{
+                      ...iconButton,
+                      color: "#EF4444",
+                    }}
+                    title="حذف"
+                    aria-label="حذف"
+                    onClick={() => deleteConfig(item.id)}
+                  >
+                    <Icon name="trash" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </section>
+        )}
+
+        <section className="panel">
+          <h2>کانفیگ‌های قابل استفاده</h2>
+
+          {activeConfigs.length === 0 && (
+            <p>کانفیگ فعالی وجود ندارد.</p>
+          )}
+
+          {activeConfigs.map((item) => (
+            <div
+              className="config-card"
+              key={item.id}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "12px",
+              }}
+            >
+              <div>
+                <strong>{item.name}</strong>
+                <p>{item.type}</p>
+              </div>
+
+              <button
+                style={iconButton}
+                title="کپی"
+                aria-label="کپی کانفیگ"
+                onClick={() => copyConfig(item.config)}
+              >
+                <Icon name="copy" />
+              </button>
+            </div>
+          ))}
+        </section>
+      </div>
+    </main>
+  );
       }
                   

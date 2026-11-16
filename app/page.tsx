@@ -12,6 +12,74 @@ type VpnConfig = {
   created_at?: string;
 };
 
+function Icon({
+  name,
+  size = 19,
+}: {
+  name: "copy" | "edit" | "trash" | "plus" | "check" | "x" | "logout" | "settings";
+  size?: number;
+}) {
+  const common = {
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.8,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    style: { display: "block", flexShrink: 0 },
+  };
+
+  return (
+    <svg {...common}>
+      {name === "copy" && (
+        <>
+          <rect x="8" y="8" width="13" height="13" rx="2" />
+          <path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" />
+        </>
+      )}
+
+      {name === "edit" && (
+        <>
+          <path d="M12 20h9" />
+          <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L9 17l-4 1 1-4Z" />
+        </>
+      )}
+
+      {name === "trash" && (
+        <>
+          <path d="M3 6h18" />
+          <path d="M8 6V4h8v2" />
+          <path d="m19 6-1 14H6L5 6" />
+          <path d="M10 11v5M14 11v5" />
+        </>
+      )}
+
+      {name === "plus" && <path d="M12 5v14M5 12h14" />}
+
+      {name === "check" && <path d="m5 12 4 4L19 6" />}
+
+      {name === "x" && <path d="m18 6-12 12M6 6l12 12" />}
+
+      {name === "logout" && (
+        <>
+          <path d="M10 17l5-5-5-5" />
+          <path d="M15 12H3" />
+          <path d="M12 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6" />
+        </>
+      )}
+
+      {name === "settings" && (
+        <>
+          <circle cx="12" cy="12" r="3" />
+          <path d="m19.4 15 .1.1 1.4 1.1-1.4 2.4-1.7-.7a8 8 0 0 1-1.7 1l-.3 1.8h-2.8l-.3-1.8a8 8 0 0 1-1.7-1l-1.7.7-1.4-2.4 1.4-1.1a7 7 0 0 1 0-2l-1.4-1.1 1.4-2.4 1.7.7a8 8 0 0 1 1.7-1l.3-1.8h2.8l.3 1.8a8 8 0 0 1 1.7 1l1.7-.7 1.4 2.4-1.4 1.1a7 7 0 0 1 0 2Z" transform="translate(-1 -1) scale(1.08)" />
+        </>
+      )}
+    </svg>
+  );
+}
+
 export default function Home() {
   const [configs, setConfigs] = useState<VpnConfig[]>([]);
   const [session, setSession] = useState<any>(null);
@@ -188,7 +256,7 @@ export default function Home() {
   async function copyConfig(value: string) {
     try {
       await navigator.clipboard.writeText(value);
-      setMessage("⧉ کپی شد");
+      setMessage("کانفیگ کپی شد");
     } catch {
       setMessage("کپی انجام نشد");
     }
@@ -197,13 +265,26 @@ export default function Home() {
   const activeConfigs = configs.filter((item) => item.active);
 
   const iconButton = {
-    width: "44px",
-    height: "42px",
-    borderRadius: "12px",
-    fontSize: "21px",
+    width: "40px",
+    height: "40px",
+    minWidth: "40px",
+    padding: 0,
+    borderRadius: "11px",
     cursor: "pointer",
     border: "1px solid var(--border, #444)",
     background: "var(--background, #222)",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    lineHeight: 1,
+    flexShrink: 0,
+  } as const;
+
+  const primaryButton = {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "8px",
   } as const;
 
   return (
@@ -246,13 +327,25 @@ export default function Home() {
                 gap: "10px",
               }}
             >
-              <h2>⚙ مدیریت</h2>
-              <button className="secondary" onClick={logout}>
-                خروج ↗
+              <h2 style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <Icon name="settings" />
+                مدیریت
+              </h2>
+
+              <button
+                className="secondary"
+                onClick={logout}
+                style={primaryButton}
+              >
+                <Icon name="logout" size={17} />
+                خروج
               </button>
             </div>
 
-            <h3>{editingId !== null ? "✎ ویرایش" : "＋ کانفیگ جدید"}</h3>
+            <h3 style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <Icon name={editingId !== null ? "edit" : "plus"} />
+              {editingId !== null ? "ویرایش کانفیگ" : "کانفیگ جدید"}
+            </h3>
 
             <input
               placeholder="نام کانفیگ"
@@ -279,12 +372,24 @@ export default function Home() {
               rows={5}
             />
 
-            <button onClick={saveConfig} disabled={loading}>
-              {loading
-                ? "..."
-                : editingId !== null
-                  ? "✓ ذخیره"
-                  : "+ افزودن"}
+            <button
+              onClick={saveConfig}
+              disabled={loading}
+              style={primaryButton}
+            >
+              {loading ? (
+                "..."
+              ) : editingId !== null ? (
+                <>
+                  <Icon name="check" size={18} />
+                  ذخیره تغییرات
+                </>
+              ) : (
+                <>
+                  <Icon name="plus" size={18} />
+                  افزودن کانفیگ
+                </>
+              )}
             </button>
 
             {editingId !== null && (
@@ -292,8 +397,10 @@ export default function Home() {
                 className="secondary"
                 onClick={resetForm}
                 disabled={loading}
+                style={primaryButton}
               >
-                ✕ انصراف
+                <Icon name="x" size={17} />
+                انصراف
               </button>
             )}
 
@@ -326,28 +433,29 @@ export default function Home() {
                     title={item.active ? "غیرفعال کردن" : "فعال کردن"}
                     onClick={() => toggleConfig(item)}
                     style={{
-                      width: "52px",
-                      height: "32px",
-                      borderRadius: "20px",
+                      width: "42px",
+                      height: "24px",
+                      borderRadius: "999px",
                       border: "none",
                       padding: "3px",
-                      background: item.active ? "#34C759" : "#8E8E93",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: item.active ? "flex-start" : "flex-end",
+                      background: item.active ? "#20B65A" : "#777777",
+                      position: "relative",
                       cursor: "pointer",
                       flexShrink: 0,
-                      transition: "background 0.2s",
+                      transition: "background 0.2s ease",
                     }}
                   >
                     <span
                       style={{
-                        width: "26px",
-                        height: "26px",
+                        position: "absolute",
+                        top: "3px",
+                        right: item.active ? "3px" : "21px",
+                        width: "18px",
+                        height: "18px",
                         borderRadius: "50%",
                         background: "#FFFFFF",
-                        display: "block",
                         boxShadow: "0 1px 3px #0004",
+                        transition: "right 0.2s ease",
                       }}
                     />
                   </button>
@@ -357,7 +465,8 @@ export default function Home() {
                   style={{
                     display: "flex",
                     justifyContent: "flex-end",
-                    gap: "9px",
+                    alignItems: "center",
+                    gap: "8px",
                     marginTop: "14px",
                   }}
                 >
@@ -367,7 +476,7 @@ export default function Home() {
                     aria-label="کپی"
                     onClick={() => copyConfig(item.config)}
                   >
-                    ⧉
+                    <Icon name="copy" />
                   </button>
 
                   <button
@@ -376,7 +485,7 @@ export default function Home() {
                     aria-label="ویرایش"
                     onClick={() => startEdit(item)}
                   >
-                    ✎
+                    <Icon name="edit" />
                   </button>
 
                   <button
@@ -388,7 +497,7 @@ export default function Home() {
                     aria-label="حذف"
                     onClick={() => deleteConfig(item.id)}
                   >
-                    🗑
+                    <Icon name="trash" />
                   </button>
                 </div>
               </div>
@@ -404,7 +513,16 @@ export default function Home() {
           )}
 
           {activeConfigs.map((item) => (
-            <div className="config-card" key={item.id}>
+            <div
+              className="config-card"
+              key={item.id}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "12px",
+              }}
+            >
               <div>
                 <strong>{item.name}</strong>
                 <p>{item.type}</p>
@@ -416,7 +534,7 @@ export default function Home() {
                 aria-label="کپی کانفیگ"
                 onClick={() => copyConfig(item.config)}
               >
-                ⧉
+                <Icon name="copy" />
               </button>
             </div>
           ))}
@@ -425,4 +543,3 @@ export default function Home() {
     </main>
   );
 }
-  

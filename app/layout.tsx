@@ -3,6 +3,12 @@ import "./style.css";
 export const metadata = {
   title: "پنل مدیریت کانفیگ VPN",
   description: "مدیریت و دریافت کانفیگ‌های VPN",
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: "/icon.png",
+    shortcut: "/icon.png",
+    apple: "/icon.png",
+  },
 };
 
 export default function RootLayout({

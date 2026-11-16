@@ -722,25 +722,24 @@ export default function Home() {
     }
   }
 
-  function getConfigAppLink(value: string): string | null {
-    const candidate = value.trim();
-
-    // فقط لینک‌های تکی و استاندارد را به برنامه‌های VPN تحویل می‌دهیم.
-    if (!/^(vless|vmess|trojan|ss):\/\/\S+$/i.test(candidate)) {
-      return null;
+  async function shareConfig(value: string, configName: string) {
+    try {
+      if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+        await navigator.share({
+          title: configName,
+          text: value,
+        });
+        setMessage("کانفیگ برای اشتراک‌گذاری ارسال شد");
+      } else {
+        await copyConfig(value);
+        setMessage("اشتراک‌گذاری در این مرورگر پشتیبانی نمی‌شود؛ کانفیگ کپی شد");
+      }
+    } catch (error: any) {
+      // بستن منوی اشتراک‌گذاری توسط کاربر خطا محسوب نمی‌شود.
+      if (error?.name !== "AbortError") {
+        setMessage("ارسال کانفیگ انجام نشد؛ از دکمه کپی استفاده کن");
+      }
     }
-
-    // در اندروید از Intent استفاده می‌کنیم تا Chrome بتواند برنامه سازگار را پیدا کند.
-    if (/^vless:\/\//i.test(candidate) &&
-        typeof navigator !== "undefined" &&
-        /Android/i.test(navigator.userAgent)) {
-      const intentData = candidate
-        .replace(/^vless:\/\//i, "intent://")
-        .replace(/#(.*)$/, "%23$1");
-      return `${intentData}#Intent;scheme=vless;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end`;
-    }
-
-    return candidate;
   }
 
   async function copyConfig(value: string) {
@@ -889,16 +888,15 @@ export default function Home() {
                   <h3>{item.name}</h3>
                   <p>نوع: {item.type}</p>
                   <textarea readOnly value={item.config} rows={4} />
-                  {getConfigAppLink(item.config) && (
-                    <a
-                      className="connect-config-button"
-                      href={getConfigAppLink(item.config)!}
-                      title="باز کردن کانفیگ در برنامه VPN"
-                    >
-                      <ExternalLink size={18} />
-                      باز کردن در برنامه VPN
-                    </a>
-                  )}
+                  <button
+                    type="button"
+                    className="connect-config-button"
+                    onClick={() => shareConfig(item.config, item.name)}
+                    title="ارسال کانفیگ به یکی از برنامه‌های نصب‌شده"
+                  >
+                    <ExternalLink size={18} />
+                    ارسال به برنامه VPN
+                  </button>
                   <button
                     type="button"
                     onClick={() => copyConfig(item.config)}

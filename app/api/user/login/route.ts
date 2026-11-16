@@ -9,7 +9,7 @@ import {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const username = String(body.username || "").trim();
+    const username = String(body.username || "").trim().toLowerCase();
     const password = String(body.password || "");
 
     if (!username || !password) {
@@ -21,7 +21,9 @@ export async function POST(request: NextRequest) {
 
     const { data: user, error } = await adminSupabase
       .from("vpn_users")
-      .select("id, username, password_hash, active")
+      .select(
+        "id, username, password_hash, active, plan_start, plan_expires_at, total_gb, used_gb"
+      )
       .eq("username", username)
       .maybeSingle();
 
@@ -41,15 +43,53 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const now = Date.now();
+
+    const startsAt = user.plan_start
+      ? new Date(user.plan_start).getTime()
+      : null;
+
+    const expiresAt = user.plan_expires_at
+      ? new Date(user.plan_expires_at).getTime()
+      : null;
+
+    const totalGb =
+      user.total_gb === null ? null : Number(user.total_gb);
+
+    const usedGb = Number(user.used_gb || 0);
+
+    if (startsAt !== null && startsAt > now) {
+      return NextResponse.json(
+        { error: "اشتراک شما هنوز شروع نشده است" },
+        { status: 403 }
+      );
+    }
+
+    if (expiresAt !== null && expiresAt <= now) {
+      return NextResponse.json(
+        { error: "اشتراک شما منقضی شده است. لطفاً تمدید کنید" },
+        { status: 403 }
+      );
+    }
+
+    if (totalGb !== null && usedGb >= totalGb) {
+      return NextResponse.json(
+        { error: "حجم اشتراک شما به پایان رسیده است" },
+        { status: 403 }
+      );
+    }
+
     const token = createSessionToken();
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const sessionExpiresAt = new Date(
+      Date.now() + 7 * 24 * 60 * 60 * 1000
+    );
 
     const { error: insertError } = await adminSupabase
       .from("vpn_user_sessions")
       .insert({
         user_id: user.id,
         token_hash: hashToken(token),
-        expires_at: expiresAt.toISOString(),
+        expires_at: sessionExpiresAt.toISOString(),
       });
 
     if (insertError) throw insertError;
@@ -64,7 +104,7 @@ export async function POST(request: NextRequest) {
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-      expires: expiresAt,
+      expires: sessionExpiresAt,
     });
 
     return response;

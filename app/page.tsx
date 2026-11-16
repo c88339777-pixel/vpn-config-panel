@@ -17,6 +17,18 @@ type VpnUser = {
   username: string;
   active: boolean;
   created_at?: string;
+  plan_start?: string | null;
+  plan_expires_at?: string | null;
+  total_gb?: number | null;
+  used_gb?: number;
+};
+
+type Subscription = {
+  plan_start: string | null;
+  plan_expires_at: string | null;
+  total_gb: number | null;
+  used_gb: number;
+  remaining_gb: number | null;
 };
 
 function Icon({
@@ -74,6 +86,38 @@ function Icon({
   );
 }
 
+function toDateInput(value?: string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return "تعیین نشده";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "نامعتبر";
+  return date.toLocaleString("fa-IR");
+}
+
+function getSubscriptionStatus(user: VpnUser) {
+  const now = Date.now();
+  const start = user.plan_start ? new Date(user.plan_start).getTime() : null;
+  const expiry = user.plan_expires_at
+    ? new Date(user.plan_expires_at).getTime()
+    : null;
+  const total = user.total_gb == null ? null : Number(user.total_gb);
+  const used = Number(user.used_gb || 0);
+
+  if (!user.active) return "مسدود";
+  if (start !== null && start > now) return "شروع نشده";
+  if (expiry !== null && expiry <= now) return "منقضی";
+  if (total !== null && used >= total) return "اتمام حجم";
+  if (!start && !expiry && total === null) return "بدون اشتراک";
+  return "فعال";
+}
+
 export default function Home() {
   const [session, setSession] = useState<any>(null);
   const [authReady, setAuthReady] = useState(false);
@@ -81,10 +125,10 @@ export default function Home() {
   const [configs, setConfigs] = useState<VpnConfig[]>([]);
   const [users, setUsers] = useState<VpnUser[]>([]);
   const [userConfigs, setUserConfigs] = useState<VpnConfig[]>([]);
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
 
   const [email, setEmail] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
-
   const [username, setUsername] = useState("");
   const [userPassword, setUserPassword] = useState("");
 
@@ -99,6 +143,13 @@ export default function Home() {
   const [selectedUser, setSelectedUser] = useState<VpnUser | null>(null);
   const [assignedConfigIds, setAssignedConfigIds] = useState<string[]>([]);
   const [passwordChanges, setPasswordChanges] = useState<Record<string, string>>({});
+
+  const [planStart, setPlanStart] = useState("");
+  const [planExpiry, setPlanExpiry] = useState("");
+  const [totalGb, setTotalGb] = useState("");
+  const [usedGb, setUsedGb] = useState("0");
+  const [renewDays, setRenewDays] = useState("30");
+  const [resetUsage, setResetUsage] = useState(true);
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -144,10 +195,7 @@ export default function Home() {
       headers.set("Content-Type", "application/json");
     }
 
-    return fetch(url, {
-      ...options,
-      headers,
-    });
+    return fetch(url, { ...options, headers });
   }
 
   async function loadConfigs() {
@@ -175,6 +223,13 @@ export default function Home() {
       }
 
       setUsers(result.users || []);
+
+      if (selectedUser) {
+        const updated = (result.users || []).find(
+          (item: VpnUser) => item.id === selectedUser.id
+        );
+        if (updated) setSelectedUser(updated);
+      }
     } catch {
       setMessage("ارتباط با سرور برقرار نشد");
     }
@@ -188,17 +243,22 @@ export default function Home() {
       if (!response.ok) {
         setUserMode(false);
         setUserConfigs([]);
+        setSubscription(null);
         setLoggedInUsername("");
-        return;
+        return false;
       }
 
       setUserMode(true);
       setLoggedInUsername(result.username || "");
       setUserConfigs(result.configs || []);
+      setSubscription(result.subscription || null);
+      return true;
     } catch {
       setUserMode(false);
       setUserConfigs([]);
+      setSubscription(null);
       setLoggedInUsername("");
+      return false;
     }
   }
 
@@ -294,8 +354,13 @@ export default function Home() {
       }
 
       setUserPassword("");
-      await loadUserConfigs();
-      setMessage("ورود موفق بود");
+      const loaded = await loadUserConfigs();
+
+      if (loaded) {
+        setMessage("ورود موفق بود");
+      } else {
+        setMessage("ورود انجام شد، اما دریافت اطلاعات حساب ممکن نشد");
+      }
     } catch {
       setMessage("خطا در ارتباط با سرور");
     }
@@ -311,6 +376,7 @@ export default function Home() {
       await fetch("/api/user/logout", { method: "POST" });
       setUserMode(false);
       setUserConfigs([]);
+      setSubscription(null);
       setLoggedInUsername("");
     }
 
@@ -543,6 +609,11 @@ export default function Home() {
     setSelectedUser(user);
     setAssignedConfigIds([]);
 
+    setPlanStart(toDateInput(user.plan_start));
+    setPlanExpiry(toDateInput(user.plan_expires_at));
+    setTotalGb(user.total_gb == null ? "" : String(user.total_gb));
+    setUsedGb(String(user.used_gb || 0));
+
     try {
       const response = await adminFetch(
         `/api/admin/users/${user.id}/configs`
@@ -601,6 +672,113 @@ export default function Home() {
     }
   }
 
+  async function saveSubscription() {
+    if (!selectedUser) return;
+
+    const total = totalGb.trim() === "" ? null : Number(totalGb);
+    const used = Number(usedGb);
+
+    if (total !== null && (!Number.isFinite(total) || total < 0)) {
+      setMessage("حجم کل باید عدد صفر یا بیشتر باشد");
+      return;
+    }
+
+    if (!Number.isFinite(used) || used < 0) {
+      setMessage("حجم مصرف‌شده نامعتبر است");
+      return;
+    }
+
+    const startIso = planStart
+      ? new Date(planStart).toISOString()
+      : null;
+    const expiryIso = planExpiry
+      ? new Date(planExpiry).toISOString()
+      : null;
+
+    if (startIso && expiryIso && new Date(expiryIso) <= new Date(startIso)) {
+      setMessage("تاریخ انقضا باید بعد از تاریخ شروع باشد");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const response = await adminFetch("/api/admin/users", {
+        method: "PATCH",
+        body: JSON.stringify({
+          id: selectedUser.id,
+          plan_start: startIso,
+          plan_expires_at: expiryIso,
+          total_gb: total,
+          used_gb: used,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        setMessage(result.error || "ذخیره اشتراک انجام نشد");
+      } else {
+        setMessage("اطلاعات اشتراک ذخیره شد");
+        await loadUsers();
+      }
+    } catch {
+      setMessage("خطا در ذخیره اشتراک");
+    }
+
+    setLoading(false);
+  }
+
+  async function renewSubscription() {
+    if (!selectedUser) return;
+
+    const days = Number(renewDays);
+
+    if (!Number.isInteger(days) || days < 1 || days > 3650) {
+      setMessage("مدت تمدید باید بین ۱ تا ۳۶۵۰ روز باشد");
+      return;
+    }
+
+    const now = new Date();
+    const expiry = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+    const used = resetUsage ? 0 : Number(usedGb);
+
+    if (!Number.isFinite(used) || used < 0) {
+      setMessage("حجم مصرف‌شده نامعتبر است");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const response = await adminFetch("/api/admin/users", {
+        method: "PATCH",
+        body: JSON.stringify({
+          id: selectedUser.id,
+          plan_start: now.toISOString(),
+          plan_expires_at: expiry.toISOString(),
+          used_gb: used,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        setMessage(result.error || "تمدید اشتراک انجام نشد");
+      } else {
+        setPlanStart(toDateInput(now.toISOString()));
+        setPlanExpiry(toDateInput(expiry.toISOString()));
+        setUsedGb(String(used));
+        setMessage(`اشتراک برای ${days} روز تمدید شد`);
+        await loadUsers();
+      }
+    } catch {
+      setMessage("خطا در تمدید اشتراک");
+    }
+
+    setLoading(false);
+  }
+
   async function copyConfig(value: string) {
     try {
       await navigator.clipboard.writeText(value);
@@ -625,415 +803,106 @@ export default function Home() {
     <main dir="rtl">
       <div className="container">
         <h1>VPN Hub</h1>
-        <p>مدیریت کانفیگ‌ها و کاربران</p>
+                <p>مدیریت کانفیگ‌ها</p>
 
-        {message && <div className="message">{message}</div>}
+        <section className="panel">
+          <h2>مدیریت کانفیگ‌ها</h2>
 
-        {!session && !userMode && (
-          <>
-            <section className="panel">
-              <h2>ورود کاربر</h2>
-              <input
-                placeholder="نام کاربری"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-              />
-              <input
-                type="password"
-                placeholder="رمز عبور"
-                value={userPassword}
-                onChange={(e) => setUserPassword(e.target.value)}
-              />
-              <button onClick={userLogin} disabled={loading}>
-                {loading ? "..." : "ورود به حساب"}
+          <form onSubmit={saveConfig}>
+            <input
+              placeholder="نام کانفیگ"
+              value={configName}
+              onChange={(e) => setConfigName(e.target.value)}
+            />
+            <input
+              placeholder="نوع کانفیگ"
+              value={configType}
+              onChange={(e) => setConfigType(e.target.value)}
+            />
+            <textarea
+              placeholder="متن کانفیگ"
+              value={configText}
+              onChange={(e) => setConfigText(e.target.value)}
+            />
+            <button type="submit">
+              {editingConfig ? "ذخیره تغییرات" : "افزودن کانفیگ"}
+            </button>
+            {editingConfig && (
+              <button type="button" onClick={cancelEditConfig}>
+                انصراف
               </button>
-            </section>
-
-            <section className="panel">
-              <h2>ورود مدیر</h2>
-              <input
-                type="email"
-                placeholder="ایمیل مدیر"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-              <input
-                type="password"
-                placeholder="رمز عبور مدیر"
-                value={adminPassword}
-                onChange={(e) => setAdminPassword(e.target.value)}
-              />
-              <button onClick={adminLogin} disabled={loading}>
-                {loading ? "..." : "ورود مدیر"}
-              </button>
-            </section>
-          </>
-        )}
-
-        {userMode && !session && (
-          <section className="panel">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
-              <div>
-                <h2>حساب کاربری</h2>
-                <p>خوش آمدی، {loggedInUsername}</p>
-              </div>
-              <button className="secondary" onClick={logout} style={primaryButton}>
-                <Icon name="logout" size={17} />
-                خروج
-              </button>
-            </div>
-
-            <h3>کانفیگ‌های اختصاصی من</h3>
-
-            {userConfigs.length === 0 && (
-              <p>هنوز کانفیگی به حساب تو اختصاص داده نشده است.</p>
             )}
+          </form>
+                    {configs.map((config) => (
+            <div className="config-item" key={config.id}>
+              <div>
+                <strong>{config.name}</strong>
+                <p>{config.type}</p>
+                <p>
+                  وضعیت: {config.active ? "فعال" : "غیرفعال"}
+                </p>
+              </div>
 
-            {userConfigs.map((item) => (
-              <div
-                className="config-card"
-                key={item.id}
-                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", marginBottom: "14px" }}
-              >
-                <div>
-                  <strong>{item.name}</strong>
-                  <p>{item.type}</p>
-                </div>
+              <div className="actions">
                 <button
-                  style={iconButton}
-                  title="کپی"
-                  aria-label="کپی کانفیگ"
-                  onClick={() => copyConfig(item.config)}
+                  type="button"
+                  onClick={() => editConfig(config)}
                 >
-                  <Icon name="copy" />
+                  ویرایش
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => toggleConfig(config)}
+                >
+                  {config.active ? "غیرفعال کردن" : "فعال کردن"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => deleteConfig(config)}
+                >
+                  حذف
                 </button>
               </div>
-            ))}
-          </section>
-        )}
 
-        {session && (
-          <>
-            <section className="panel">
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
-                <h2>مدیریت مدیر</h2>
-                <button className="secondary" onClick={logout} style={primaryButton}>
-                  <Icon name="logout" size={17} />
-                  خروج
-                </button>
-              </div>
+              <textarea readOnly value={config.config} />
 
-              <h3>آمار پنل</h3>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "10px" }}>
-                {[
-                  ["کل کانفیگ‌ها", configs.length],
-                  ["کانفیگ‌های فعال", activeConfigs.length],
-                  ["کانفیگ‌های غیرفعال", inactiveConfigs.length],
-                  ["کل کاربران", users.length],
-                  ["کاربران فعال", activeUsers.length],
-                ].map(([label, value]) => (
-                  <div className="config-card" key={String(label)} style={{ textAlign: "center" }}>
-                    <strong style={{ fontSize: "24px" }}>{value}</strong>
-                    <p>{label}</p>
-                  </div>
-                ))}
-              </div>
-            </section>
+              <h4>اختصاص به کاربر</h4>
 
-            <section className="panel">
-              <h2>مدیریت کانفیگ‌ها</h2>
+              {users.map((user) => {
+                const assigned = assignedConfigs[user.id]?.includes(
+                  config.id
+                );
 
-              <h3 style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <Icon name={editingId !== null ? "edit" : "plus"} />
-                {editingId !== null ? "ویرایش کانفیگ" : "کانفیگ جدید"}
-              </h3>
-
-              <input
-                placeholder="نام کانفیگ"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-
-              <select value={type} onChange={(e) => setType(e.target.value)}>
-                <option>VLESS</option>
-                <option>VMess</option>
-                <option>Trojan</option>
-                <option>Shadowsocks</option>
-                <option>WireGuard</option>
-                <option>Subscription</option>
-              </select>
-
-              <textarea
-                placeholder="متن کانفیگ را وارد کن"
-                rows={5}
-                value={config}
-                onChange={(e) => setConfig(e.target.value)}
-              />
-
-              <button onClick={saveConfig} disabled={loading} style={primaryButton}>
-                                <Icon name={editingId !== null ? "check" : "plus"} />
-                {loading
-                  ? "..."
-                  : editingId !== null
-                    ? "ذخیره تغییرات"
-                    : "افزودن کانفیگ"}
-              </button>
-
-              {editingId !== null && (
-                <button className="secondary" onClick={resetForm}>
-                  انصراف از ویرایش
-                </button>
-              )}
-
-              <h3>کانفیگ‌های ثبت‌شده ({configs.length})</h3>
-
-              {configs.length === 0 && (
-                <p>هنوز کانفیگی ثبت نشده است.</p>
-              )}
-
-              {configs.map((item) => (
-                <div
-                  className="config-card"
-                  key={item.id}
-                  style={{ marginBottom: "12px" }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      gap: "10px",
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    <div>
-                      <strong>{item.name}</strong>
-                      <p>
-                        {item.type} — {item.active ? "فعال" : "غیرفعال"}
-                      </p>
-                    </div>
-
-                    <div style={{ display: "flex", gap: "7px" }}>
-                      <button
-                        style={iconButton}
-                        title="ویرایش"
-                        onClick={() => startEdit(item)}
-                      >
-                        <Icon name="edit" />
-                      </button>
-
-                      <button
-                        style={iconButton}
-                        title={item.active ? "غیرفعال کردن" : "فعال کردن"}
-                        onClick={() => toggleConfig(item)}
-                      >
-                        <Icon name={item.active ? "x" : "check"} />
-                      </button>
-
-                      <button
-                        style={iconButton}
-                        title="حذف"
-                        onClick={() => deleteConfig(item.id)}
-                      >
-                        <Icon name="trash" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </section>
-
-            <section className="panel">
-              <h2>ساخت کاربر جدید</h2>
-
-              <input
-                placeholder="نام کاربری (حروف انگلیسی و عدد)"
-                value={newUsername}
-                onChange={(e) => setNewUsername(e.target.value)}
-              />
-
-              <input
-                type="password"
-                placeholder="رمز عبور (حداقل ۸ کاراکتر)"
-                value={newUserPassword}
-                onChange={(e) => setNewUserPassword(e.target.value)}
-              />
-
-              <button
-                onClick={createUser}
-                disabled={loading}
-                style={primaryButton}
-              >
-                <Icon name="plus" />
-                {loading ? "..." : "ساخت کاربر"}
-              </button>
-            </section>
-
-            <section className="panel">
-              <h2>مدیریت کاربران ({users.length})</h2>
-
-              {users.length === 0 && (
-                <p>هنوز کاربری ساخته نشده است.</p>
-              )}
-
-              {users.map((user) => (
-                <div
-                  className="config-card"
-                  key={user.id}
-                  style={{ marginBottom: "14px" }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      gap: "10px",
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    <div>
-                      <strong>{user.username}</strong>
-                      <p>{user.active ? "فعال" : "مسدود"}</p>
-                    </div>
-
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: "7px",
-                        flexWrap: "wrap",
-                      }}
-                    >
-                      <button
-                        className="secondary"
-                        onClick={() => openAssignments(user)}
-                      >
-                        مدیریت کانفیگ‌ها
-                      </button>
-
-                      <button
-                        style={iconButton}
-                        title={user.active ? "مسدود کردن" : "فعال کردن"}
-                        onClick={() => toggleUser(user)}
-                      >
-                        <Icon name={user.active ? "x" : "check"} />
-                      </button>
-
-                      <button
-                        style={iconButton}
-                        title="حذف کاربر"
-                        onClick={() => deleteUser(user)}
-                      >
-                        <Icon name="trash" />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: "8px",
-                      marginTop: "12px",
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    <input
-                      type="password"
-                      placeholder="رمز عبور جدید"
-                      value={passwordChanges[user.id] || ""}
-                      onChange={(e) =>
-                        setPasswordChanges((previous) => ({
-                          ...previous,
-                          [user.id]: e.target.value,
-                        }))
-                      }
-                      style={{ flex: "1", minWidth: "150px" }}
-                    />
+                return (
+                  <div className="assignment-row" key={user.id}>
+                    <span>{user.username}</span>
 
                     <button
-                      className="secondary"
-                      onClick={() => changeUserPassword(user)}
+                      type="button"
+                      onClick={() =>
+                        toggleAssignment(
+                          user.id,
+                          config.id,
+                          !!assigned
+                        )
+                      }
                     >
-                      تغییر رمز
+                      {assigned ? "حذف دسترسی" : "اختصاص کانفیگ"}
                     </button>
                   </div>
-                </div>
-              ))}
-            </section>
-
-            {selectedUser && (
-              <section className="panel">
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    gap: "10px",
-                  }}
-                >
-                  <h2>
-                    کانفیگ‌های کاربر {selectedUser.username}
-                  </h2>
-
-                  <button
-                    className="secondary"
-                    onClick={() => setSelectedUser(null)}
-                  >
-                    بستن
-                  </button>
-                </div>
-
-                <p>
-                  برای اختصاص یا برداشتن کانفیگ، روی دکمه کنار آن بزن.
-                </p>
-
-                {configs.length === 0 && (
-                  <p>هیچ کانفیگی در پنل وجود ندارد.</p>
-                )}
-
-                {configs.map((item) => {
-                  const assigned = assignedConfigIds.includes(
-                    String(item.id)
-                  );
-
-                  return (
-                    <div
-                      className="config-card"
-                      key={item.id}
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        gap: "10px",
-                        marginBottom: "10px",
-                      }}
-                    >
-                      <div>
-                        <strong>{item.name}</strong>
-                        <p>
-                          {item.type} — {item.active ? "فعال" : "غیرفعال"}
-                        </p>
-                      </div>
-
-                      <button
-                        className={assigned ? "secondary" : ""}
-                        onClick={() => toggleAssignment(item.id)}
-                        disabled={!item.active && !assigned}
-                        style={primaryButton}
-                      >
-                        <Icon
-                          name={assigned ? "x" : "plus"}
-                          size={17}
-                        />
-                        {assigned ? "برداشتن" : "اختصاص"}
-                      </button>
-                    </div>
-                  );
-                })}
-              </section>
-            )}
-          </>
-        )}
-      </div>
-    </main>
-  );
+                );
+              })}
+            </div>
+          ))}
+        </section>
+                <button type="button" onClick={adminLogout}>
+          خروج مدیر
+        </button>
+      </>
+    )}
+  </div>
+</main>
+);
 }

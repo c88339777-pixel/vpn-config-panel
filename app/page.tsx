@@ -20,7 +20,7 @@ import {
   Plus,
   Check,
   Search,
-  ExternalLink,
+  Smartphone,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
@@ -92,6 +92,21 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [userMode, setUserMode] = useState(false);
+  const [devicePlatform, setDevicePlatform] = useState<"android" | "ios" | "other">("other");
+
+  useEffect(() => {
+    const userAgent = window.navigator.userAgent || "";
+    if (/android/i.test(userAgent)) {
+      setDevicePlatform("android");
+    } else if (
+      /iphone|ipad|ipod/i.test(userAgent) ||
+      (/macintosh/i.test(userAgent) && window.navigator.maxTouchPoints > 1)
+    ) {
+      setDevicePlatform("ios");
+    } else {
+      setDevicePlatform("other");
+    }
+  }, []);
 
   const activeConfigs = configs.filter((item) => item.active);
   const inactiveConfigs = configs.filter((item) => !item.active);
@@ -722,24 +737,20 @@ export default function Home() {
     }
   }
 
-  async function shareConfig(value: string, configName: string) {
-    try {
-      if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
-        await navigator.share({
-          title: configName,
-          text: value,
-        });
-        setMessage("کانفیگ برای اشتراک‌گذاری ارسال شد");
-      } else {
-        await copyConfig(value);
-        setMessage("اشتراک‌گذاری در این مرورگر پشتیبانی نمی‌شود؛ کانفیگ کپی شد");
-      }
-    } catch (error: any) {
-      // بستن منوی اشتراک‌گذاری توسط کاربر خطا محسوب نمی‌شود.
-      if (error?.name !== "AbortError") {
-        setMessage("ارسال کانفیگ انجام نشد؛ از دکمه کپی استفاده کن");
-      }
+  function openConfigInAndroidApp(value: string, packageName: string, appName: string) {
+    if (devicePlatform !== "android") {
+      setMessage("این گزینه فقط در گوشی اندرویدی قابل استفاده است");
+      return;
     }
+
+    // هر دو برنامه از دریافت متن ساده از طریق Android ACTION_SEND استفاده می‌کنند.
+    const sharedText = encodeURIComponent(value);
+    const intentUrl =
+      `intent:#Intent;action=android.intent.action.SEND;type=text/plain;` +
+      `S.android.intent.extra.TEXT=${sharedText};package=${packageName};end`;
+
+    setMessage(`در حال باز کردن ${appName}...`);
+    window.location.href = intentUrl;
   }
 
   async function copyConfig(value: string) {
@@ -888,24 +899,47 @@ export default function Home() {
                   <h3>{item.name}</h3>
                   <p>نوع: {item.type}</p>
                   <textarea readOnly value={item.config} rows={4} />
-                  <button
-                    type="button"
-                    className="connect-config-button"
-                    onClick={() => shareConfig(item.config, item.name)}
-                    title="ارسال کانفیگ به یکی از برنامه‌های نصب‌شده"
-                  >
-                    <ExternalLink size={18} />
-                    ارسال به برنامه VPN
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => copyConfig(item.config)}
-                    title="کپی کانفیگ"
-                    aria-label="کپی کانفیگ"
-                  >
-                    <Copy size={18} />
-                    کپی کانفیگ
-                  </button>
+                  {devicePlatform === "android" ? (
+                    <>
+                      <button
+                        type="button"
+                        className="connect-config-button"
+                        onClick={() =>
+                          openConfigInAndroidApp(item.config, "com.v2ray.ang", "V2RayNG")
+                        }
+                        title="ارسال مستقیم کانفیگ به V2RayNG"
+                      >
+                        <Smartphone size={18} />
+                        باز کردن در V2RayNG
+                      </button>
+                      <button
+                        type="button"
+                        className="connect-config-button"
+                        onClick={() =>
+                          openConfigInAndroidApp(
+                            item.config,
+                            "dev.hexasoftware.v2box",
+                            "V2Box"
+                          )
+                        }
+                        title="ارسال مستقیم کانفیگ به V2Box"
+                      >
+                        <Smartphone size={18} />
+                        باز کردن در V2Box
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      className="connect-config-button"
+                      onClick={() => copyConfig(item.config)}
+                      title="کپی کانفیگ برای واردکردن در برنامه VPN"
+                      aria-label="کپی کانفیگ"
+                    >
+                      <Copy size={18} />
+                      کپی کانفیگ
+                    </button>
+                  )}
                 </div>
               ))
             )}

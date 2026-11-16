@@ -449,3 +449,57 @@ button svg {
   .user-card-actions input { grid-column: 1 / -1; }
   .user-card-actions button { width: 100%; margin: 0; }
 }
+
+
+/* جست‌وجو و فیلتر فهرست کاربران */
+.user-tools {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(180px, 1fr);
+  gap: 10px;
+  margin: 14px 0 20px;
+  align-items: center;
+}
+
+.user-search {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  padding: 0 12px;
+  border: 1px solid #34445d;
+  border-radius: 13px;
+  background: #0b1425;
+  color: var(--muted);
+  transition: border-color .2s ease, box-shadow .2s ease;
+}
+
+.user-search:focus-within {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px #19a9ff20;
+}
+
+.user-search input {
+  min-width: 0;
+  margin: 0;
+  padding: 14px 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.user-search input:focus {
+  border: 0;
+  box-shadow: none;
+  outline: none;
+}
+
+.user-tools select {
+  margin: 0;
+  min-width: 0;
+}
+
+@media (max-width: 600px) {
+  .user-tools {
+    grid-template-columns: 1fr;
+  }
+}

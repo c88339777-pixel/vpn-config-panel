@@ -19,6 +19,7 @@ import {
   X,
   Plus,
   Check,
+  Search,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
@@ -56,6 +57,8 @@ export default function Home() {
 
   const [configs, setConfigs] = useState<VpnConfig[]>([]);
   const [users, setUsers] = useState<VpnUser[]>([]);
+  const [userSearch, setUserSearch] = useState("");
+  const [userFilter, setUserFilter] = useState("all");
   const [userConfigs, setUserConfigs] = useState<VpnConfig[]>([]);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
 
@@ -91,6 +94,21 @@ export default function Home() {
 
   const activeConfigs = configs.filter((item) => item.active);
   const inactiveConfigs = configs.filter((item) => !item.active);
+
+  const filteredUsers = users.filter((user) => {
+    const matchesSearch = user.username
+      .toLocaleLowerCase("fa")
+      .includes(userSearch.trim().toLocaleLowerCase("fa"));
+    const status = getSubscriptionStatus(user.plan_expires_at);
+    const matchesFilter =
+      userFilter === "all" ||
+      (userFilter === "account-active" && user.active) ||
+      (userFilter === "account-inactive" && !user.active) ||
+      (userFilter === "subscription-active" && status.className === "subscription-active") ||
+      (userFilter === "subscription-warning" && status.className === "subscription-warning") ||
+      (userFilter === "subscription-expired" && status.className === "subscription-expired");
+    return matchesSearch && matchesFilter;
+  });
 
   async function adminFetch(url: string, options: RequestInit = {}) {
     if (!session?.access_token) {
@@ -1049,9 +1067,37 @@ export default function Home() {
                 </button>
               </form>
 
-              <h3>فهرست کاربران ({users.length})</h3>
+              <h3>فهرست کاربران ({filteredUsers.length} از {users.length})</h3>
 
-              {users.map((user) => {
+              <div className="user-tools">
+                <div className="user-search">
+                  <Search size={18} />
+                  <input
+                    type="search"
+                    placeholder="جست‌وجوی نام کاربری..."
+                    value={userSearch}
+                    onChange={(event) => setUserSearch(event.target.value)}
+                    aria-label="جست‌وجوی کاربران"
+                  />
+                </div>
+
+                <select
+                  value={userFilter}
+                  onChange={(event) => setUserFilter(event.target.value)}
+                  aria-label="فیلتر وضعیت کاربران"
+                >
+                  <option value="all">همه کاربران</option>
+                  <option value="account-active">حساب‌های فعال</option>
+                  <option value="account-inactive">حساب‌های غیرفعال</option>
+                  <option value="subscription-active">اشتراک فعال</option>
+                  <option value="subscription-warning">نزدیک انقضا</option>
+                  <option value="subscription-expired">اشتراک منقضی‌شده</option>
+                </select>
+              </div>
+
+              {filteredUsers.length === 0 ? (
+                <p className="message">کاربری با این جست‌وجو یا فیلتر پیدا نشد.</p>
+              ) : filteredUsers.map((user) => {
                 const subscriptionStatus = getSubscriptionStatus(user.plan_expires_at);
 
                 return (

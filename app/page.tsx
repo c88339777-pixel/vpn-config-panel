@@ -510,6 +510,50 @@ export default function Home() {
     return date.toLocaleDateString("fa-IR");
   }
 
+  function getSubscriptionStatus(value?: string | null) {
+    if (!value) {
+      return {
+        label: "تاریخ انقضا ثبت نشده",
+        detail: "برای تعیین وضعیت، تاریخ پایان اشتراک را ثبت کنید",
+        className: "subscription-unknown",
+      };
+    }
+
+    const expiry = new Date(value);
+    if (Number.isNaN(expiry.getTime())) {
+      return {
+        label: "تاریخ نامعتبر",
+        detail: "تاریخ پایان اشتراک قابل تشخیص نیست",
+        className: "subscription-unknown",
+      };
+    }
+
+    const remainingMs = expiry.getTime() - Date.now();
+    const remainingDays = Math.ceil(remainingMs / (1000 * 60 * 60 * 24));
+
+    if (remainingMs <= 0) {
+      return {
+        label: "اشتراک منقضی‌شده",
+        detail: "زمان اشتراک این کاربر به پایان رسیده است",
+        className: "subscription-expired",
+      };
+    }
+
+    if (remainingDays <= 7) {
+      return {
+        label: "نزدیک انقضا",
+        detail: `${remainingDays} روز تا پایان اشتراک`,
+        className: "subscription-warning",
+      };
+    }
+
+    return {
+      label: "اشتراک فعال",
+      detail: `${remainingDays} روز باقی‌مانده`,
+      className: "subscription-active",
+    };
+  }
+
   async function openAssignments(user: VpnUser) {
     setSelectedUser(user);
     setPlanStart(toDateInput(user.plan_start));
@@ -1007,61 +1051,92 @@ export default function Home() {
 
               <h3>فهرست کاربران ({users.length})</h3>
 
-              {users.map((user) => (
-                <div className="panel" key={user.id}>
-                  <h3>{user.username}</h3>
-                  <p>وضعیت: {user.active ? "فعال" : "غیرفعال"}</p>
-                  <p>شروع اشتراک: {formatDate(user.plan_start)}</p>
-                  <p>پایان اشتراک: {formatDate(user.plan_expires_at)}</p>
+              {users.map((user) => {
+                const subscriptionStatus = getSubscriptionStatus(user.plan_expires_at);
 
-                  <button
-                    type="button"
-                    onClick={() => openAssignments(user)}
-                    title="مدیریت اشتراک و کانفیگ‌ها"
-                  >
-                    <Settings size={18} />
-                    مدیریت اشتراک و کانفیگ‌ها
-                  </button>
+                return (
+                  <div className="panel user-card" key={user.id}>
+                    <div className="user-card-header">
+                      <div>
+                        <h3 className="user-card-name">
+                          <UserRound size={19} />
+                          {user.username}
+                        </h3>
+                        <span className={`status-badge ${user.active ? "account-active" : "account-inactive"}`}>
+                          {user.active ? "حساب فعال" : "حساب غیرفعال"}
+                        </span>
+                      </div>
 
-                  <button
-                    type="button"
-                    onClick={() => toggleUser(user)}
-                    title={user.active ? "غیرفعال کردن کاربر" : "فعال کردن کاربر"}
-                  >
-                    <Power size={18} />
-                    {user.active ? "غیرفعال کردن" : "فعال کردن"}
-                  </button>
+                      <span className={`status-badge subscription-badge ${subscriptionStatus.className}`}>
+                        {subscriptionStatus.label}
+                      </span>
+                    </div>
 
-                  <input
-                    type="password"
-                    placeholder="رمز عبور جدید"
-                    value={passwordChanges[user.id] || ""}
-                    onChange={(event) =>
-                      setPasswordChanges((previous) => ({
-                        ...previous,
-                        [user.id]: event.target.value,
-                      }))
-                    }
-                  />
+                    <div className="user-subscription-info">
+                      <div className="user-info-row">
+                        <span>شروع اشتراک</span>
+                        <strong>{formatDate(user.plan_start)}</strong>
+                      </div>
+                      <div className="user-info-row">
+                        <span>پایان اشتراک</span>
+                        <strong>{formatDate(user.plan_expires_at)}</strong>
+                      </div>
+                      <p className={`subscription-detail ${subscriptionStatus.className}`}>
+                        {subscriptionStatus.detail}
+                      </p>
+                    </div>
 
-                  <button
-                    type="button"
-                    onClick={() => changeUserPassword(user)}
-                  >
-                    <KeyRound size={18} />
-                    تغییر رمز
-                  </button>
+                    <div className="user-card-actions">
+                      <button
+                        type="button"
+                        onClick={() => openAssignments(user)}
+                        title="مدیریت اشتراک و کانفیگ‌ها"
+                      >
+                        <Settings size={18} />
+                        مدیریت اشتراک و کانفیگ‌ها
+                      </button>
 
-                  <button
-                    type="button"
-                    onClick={() => deleteUser(user)}
-                    className="danger"
-                  >
-                    <Trash2 size={18} />
-                    حذف کاربر
-                  </button>
-                </div>
-              ))}
+                      <button
+                        type="button"
+                        onClick={() => toggleUser(user)}
+                        title={user.active ? "غیرفعال کردن کاربر" : "فعال کردن کاربر"}
+                      >
+                        <Power size={18} />
+                        {user.active ? "غیرفعال کردن" : "فعال کردن"}
+                      </button>
+
+                      <input
+                        type="password"
+                        placeholder="رمز عبور جدید"
+                        value={passwordChanges[user.id] || ""}
+                        onChange={(event) =>
+                          setPasswordChanges((previous) => ({
+                            ...previous,
+                            [user.id]: event.target.value,
+                          }))
+                        }
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() => changeUserPassword(user)}
+                      >
+                        <KeyRound size={18} />
+                        تغییر رمز
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => deleteUser(user)}
+                        className="danger"
+                      >
+                        <Trash2 size={18} />
+                        حذف کاربر
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </section>
 
             {selectedUser && (

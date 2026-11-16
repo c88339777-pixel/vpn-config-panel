@@ -352,3 +352,100 @@ button svg {
     margin: 2px;
   }
 }
+
+
+/* ---------- User cards and subscription status ---------- */
+.user-card {
+  border-color: #2b405c;
+  background: linear-gradient(145deg, #172438, #101827);
+}
+.user-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.user-card-name {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 0 10px;
+  color: #f1f5f9;
+  overflow-wrap: anywhere;
+}
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  padding: 6px 11px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+.account-active, .subscription-active {
+  color: #86efac;
+  background: #14532d35;
+  border-color: #22c55e66;
+}
+.account-inactive, .subscription-expired {
+  color: #fca5a5;
+  background: #7f1d1d35;
+  border-color: #ef444466;
+}
+.subscription-warning {
+  color: #fde68a;
+  background: #78350f35;
+  border-color: #f59e0b77;
+}
+.subscription-unknown {
+  color: #cbd5e1;
+  background: #33415555;
+  border-color: #64748b77;
+}
+.user-subscription-info {
+  padding: 13px 14px;
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #07111f80;
+}
+.user-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 0;
+  font-size: 13px;
+}
+.user-info-row span { color: var(--muted); }
+.user-info-row strong { color: var(--text); text-align: left; }
+.subscription-detail {
+  margin: 9px 0 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+.subscription-detail.subscription-active { color: #86efac; }
+.subscription-detail.subscription-warning { color: #fde68a; }
+.subscription-detail.subscription-expired { color: #fca5a5; }
+.subscription-detail.subscription-unknown { color: #cbd5e1; }
+.user-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+}
+.user-card-actions input { flex: 1 1 100%; margin: 7px 0 2px; }
+@media (max-width: 600px) {
+  .user-card-header { align-items: stretch; flex-direction: column; }
+  .subscription-badge { align-self: flex-start; }
+  .user-info-row { align-items: flex-start; }
+  .user-card-actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .user-card-actions button:first-child,
+  .user-card-actions input { grid-column: 1 / -1; }
+  .user-card-actions button { width: 100%; margin: 0; }
+}

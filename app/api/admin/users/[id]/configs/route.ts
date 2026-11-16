@@ -39,8 +39,9 @@ export async function POST(request: NextRequest, { params }: Context) {
 
   try {
     const body = await request.json();
+    const rawConfigId = body.configId ?? body.config_id;
     const configId =
-      typeof body.configId === "string" ? body.configId.trim() : "";
+      typeof rawConfigId === "string" ? rawConfigId.trim() : "";
 
     if (!configId || configId.length > 100) {
       return NextResponse.json(
@@ -97,8 +98,9 @@ export async function DELETE(request: NextRequest, { params }: Context) {
 
   try {
     const body = await request.json();
+    const rawConfigId = body.configId ?? body.config_id;
     const configId =
-      typeof body.configId === "string" ? body.configId.trim() : "";
+      typeof rawConfigId === "string" ? rawConfigId.trim() : "";
 
     if (!configId) {
       return NextResponse.json(

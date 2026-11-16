@@ -726,11 +726,21 @@ export default function Home() {
     const candidate = value.trim();
 
     // فقط لینک‌های تکی و استاندارد را به برنامه‌های VPN تحویل می‌دهیم.
-    if (/^(vless|vmess|trojan|ss):\/\/\S+$/i.test(candidate)) {
-      return candidate;
+    if (!/^(vless|vmess|trojan|ss):\/\/\S+$/i.test(candidate)) {
+      return null;
     }
 
-    return null;
+    // در اندروید از Intent استفاده می‌کنیم تا Chrome بتواند برنامه سازگار را پیدا کند.
+    if (/^vless:\/\//i.test(candidate) &&
+        typeof navigator !== "undefined" &&
+        /Android/i.test(navigator.userAgent)) {
+      const intentData = candidate
+        .replace(/^vless:\/\//i, "intent://")
+        .replace(/#(.*)$/, "%23$1");
+      return `${intentData}#Intent;scheme=vless;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end`;
+    }
+
+    return candidate;
   }
 
   async function copyConfig(value: string) {

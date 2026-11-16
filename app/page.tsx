@@ -803,7 +803,6 @@ export default function Home() {
     <main dir="rtl">
       <div className="container">
         <h1>VPN Hub</h1>
-                <p>مدیریت کانفیگ‌ها</p>
 
         <section className="panel">
           <h2>مدیریت کانفیگ‌ها</h2>

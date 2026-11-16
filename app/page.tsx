@@ -20,6 +20,7 @@ import {
   Plus,
   Check,
   Search,
+  ExternalLink,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
@@ -721,6 +722,17 @@ export default function Home() {
     }
   }
 
+  function getConfigAppLink(value: string): string | null {
+    const candidate = value.trim();
+
+    // فقط لینک‌های تکی و استاندارد را به برنامه‌های VPN تحویل می‌دهیم.
+    if (/^(vless|vmess|trojan|ss):\/\/\S+$/i.test(candidate)) {
+      return candidate;
+    }
+
+    return null;
+  }
+
   async function copyConfig(value: string) {
     try {
       await navigator.clipboard.writeText(value);
@@ -867,6 +879,16 @@ export default function Home() {
                   <h3>{item.name}</h3>
                   <p>نوع: {item.type}</p>
                   <textarea readOnly value={item.config} rows={4} />
+                  {getConfigAppLink(item.config) && (
+                    <a
+                      className="connect-config-button"
+                      href={getConfigAppLink(item.config)!}
+                      title="باز کردن کانفیگ در برنامه VPN"
+                    >
+                      <ExternalLink size={18} />
+                      باز کردن در برنامه VPN
+                    </a>
+                  )}
                   <button
                     type="button"
                     onClick={() => copyConfig(item.config)}
@@ -874,6 +896,7 @@ export default function Home() {
                     aria-label="کپی کانفیگ"
                   >
                     <Copy size={18} />
+                    کپی کانفیگ
                   </button>
                 </div>
               ))

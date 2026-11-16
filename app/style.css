@@ -608,3 +608,44 @@ button svg {
     font-size: 20px;
   }
 }
+
+
+/* دکمه باز کردن لینک کانفیگ در برنامه VPN */
+.connect-config-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 4px;
+  padding: 13px 19px;
+  border: 1px solid #168bd0;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #16a7f5, #0876bd);
+  color: #fff;
+  font-size: 14px;
+  font-weight: bold;
+  text-decoration: none;
+  box-shadow: 0 4px 16px #0284c733;
+  transition: transform .2s, filter .2s, box-shadow .2s;
+}
+
+.connect-config-button:hover {
+  color: #fff;
+  filter: brightness(1.15);
+  box-shadow: 0 5px 20px #0284c755;
+}
+
+.connect-config-button:active {
+  transform: scale(.97);
+}
+
+.connect-config-button:focus-visible {
+  outline: 2px solid #7dd3fc;
+  outline-offset: 3px;
+}
+
+@media (max-width: 600px) {
+  .connect-config-button {
+    padding: 12px 15px;
+  }
+}

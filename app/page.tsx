@@ -1,6 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  Copy, Pencil, Trash2, UserPlus, UserRound,
+  ShieldCheck, Settings, LogOut, Bell, Server,
+  Users, KeyRound, Power, CalendarDays, HardDrive,
+  X, Plus, Check
+} from "lucide-react";
 import { supabase } from "../lib/supabase";
 
 type VpnConfig = {

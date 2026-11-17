@@ -1,23 +1,54 @@
-# VPN Hub — نسخه شروع
+# VPN Hub
 
-## ۱) Supabase
-1. یک پروژه در Supabase بساز.
-2. در SQL Editor محتوای `supabase/schema.sql` را اجرا کن.
-3. در Authentication > Users فقط یک حساب مدیر با ایمیل و رمز قوی بساز؛ ثبت‌نام عمومی را فعال نکن.
-4. در Project Settings > API، Project URL و anon/public key را بردار.
+Next.js + Supabase control panel for managing VPN configs and customer access.
+The Android client is a separate app and connects to this panel through the API
+contract in `docs-android-integration.md`.
 
-## ۲) Vercel
-در پروژه متصل به GitHub، Settings > Environment Variables این دو متغیر را برای Production اضافه کن:
+## 1. Supabase setup
+
+1. Create a Supabase project.
+2. Run the complete `supabase/schema.sql` in SQL Editor.
+3. In Authentication > Users, create the administrator account. Keep public sign-up
+   disabled.
+4. Copy the project's URL, anon/publishable key, and service-role/secret key.
+5. Find the administrator's Auth UID. The current value is hard-coded in
+   `lib/admin-auth.ts` and repeated in the `vpn_configs` RLS policy in
+   `supabase/schema.sql`. If it differs, replace it in both locations before deploy.
+
+## 2. Vercel environment variables
+
+Set these for Production (and Preview only if you intentionally use Preview):
+
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-سپس Deploy مجدد کن.
+- `SUPABASE_SERVICE_ROLE_KEY` (**server-only secret**)
 
-## ۳) اجرا
-`npm install` و سپس `npm run dev`
+Never add the service-role key to a `NEXT_PUBLIC_` variable, the Android app,
+GitHub source, or a client-side file. Redeploy after changing environment variables.
 
-## امنیت و محدودیت‌ها
-- هرگز `service_role` key را در کد، GitHub یا مرورگر قرار نده.
-- کانفیگ‌های فعال برای بازدیدکنندگان قابل خواندن‌اند؛ فقط کانفیگ‌هایی را اضافه کن که مجاز به اشتراک‌گذاری‌شان هستی.
-- این نسخه‌ی شروع، هر حساب احرازشده‌ی Supabase را قادر به تغییر داده می‌کند؛ حساب Auth را فقط برای مدیر نگه دار و ثبت‌نام عمومی را فعال نکن. پیش از استفاده عمومی، سیاست مدیرمحور (admin role) را سخت‌گیرانه‌تر می‌کنیم.
-- دکمه فعلاً کانفیگ را کپی می‌کند؛ اتصال واقعی در اپ سازگار انجام می‌شود. لینک‌های اشتراک HTTPS ممکن است با اپ‌های مختلف متفاوت باز شوند. WireGuard و پروتکل‌های V2Ray فرمت‌های متفاوتی دارند.
-- پروژه هنوز Build و روی سرویس واقعی تست نشده است.
+## 3. Run locally
+
+```bash
+npm install
+npm run dev
+```
+
+## 4. Android app integration
+
+The intended native flow is username/password login via `POST /api/user/login`,
+then fetch assigned configs via `GET /api/user/configs`, retaining the session cookie.
+See `docs-android-integration.md` for request/response details.
+
+## Security and current limitations
+
+- Customer passwords are hashed with scrypt; session tokens are random and only their
+  SHA-256 hashes are stored in the database.
+- RLS is enabled. Browser-side config management is restricted to the configured
+  Supabase administrator UID. Customer/session tables are accessed only server-side
+  using the service-role key after API authentication.
+- Add rate limiting to login before public production use.
+- `used_gb` is currently an admin-maintained value, not live measured traffic. Real
+  quota enforcement needs trusted usage accounting.
+- Only add VPN configurations you are authorized to distribute. Supported protocol
+  parsing depends on the Android core integration; WireGuard and Xray/V2Ray formats
+  are not interchangeable.

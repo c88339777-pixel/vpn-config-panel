@@ -1,34 +1,15 @@
 import "server-only";
-import { createClient } from "@supabase/supabase-js";
 import { NextRequest } from "next/server";
+import { getCurrentUser } from "./user-session";
 
-const ADMIN_UID = "88d549d1-2a8c-4604-bd14-6afa6a0b335f";
-
-const authClient = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  }
-);
+const ADMIN_USER_ID = "88d549d1-2a8c-4604-bd14-6afa6a0b335f";
 
 export async function isAdmin(request: NextRequest) {
-  const authorization = request.headers.get("authorization");
+  const user = await getCurrentUser(request);
 
-  if (!authorization?.startsWith("Bearer ")) {
+  if (!user) {
     return false;
   }
 
-  const token = authorization.slice(7);
-
-  const { data, error } = await authClient.auth.getUser(token);
-
-  if (error || !data.user) {
-    return false;
-  }
-
-  return data.user.id === ADMIN_UID;
+  return user.id === ADMIN_USER_ID;
 }

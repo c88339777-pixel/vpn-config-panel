@@ -4,7 +4,7 @@ import { adminSupabase } from "./server-supabase";
 
 // Supabase Auth UID of the administrator account.
 // Must match the UID used in the vpn_configs RLS policy in supabase/schema.sql.
-const ADMIN_USER_ID = "88d549d1-2a8c-4604-bd14-6afa6a0b335f";
+export const ADMIN_USER_ID = "88d549d1-2a8c-4604-bd14-6afa6a0b335f";
 
 /**
  * The admin signs in through Supabase Auth in the browser, and the frontend

@@ -52,3 +52,21 @@ See `docs-android-integration.md` for request/response details.
 - Only add VPN configurations you are authorized to distribute. Supported protocol
   parsing depends on the Android core integration; WireGuard and Xray/V2Ray formats
   are not interchangeable.
+
+## 5. Subscription link for iPhone and third-party apps
+
+Each customer gets a private subscription link (`/api/sub/<token>`) on their user page,
+with one-tap "add to app" buttons (Streisand, V2Box, sing-box, Hiddify, Happ) and a QR code.
+
+1. Run the new block at the end of `supabase/schema.sql` once (adds `vpn_users.sub_token`).
+2. Run `npm install` (adds the `qrcode` package) and redeploy.
+3. Optional environment variables:
+   - `SITE_URL` - public address used when building links (default: the request's own origin).
+   - `SUB_PROFILE_TITLE` - profile name shown in apps (default: `Xylen VPN`).
+
+The endpoint returns the user's active, assigned URI-style configs (`vless://`, `vmess://`,
+`trojan://`, `ss://`, ...) as a base64 list, plus `Subscription-Userinfo` (used/total data and
+expiry). It answers 403 when the plan has not started, has expired or is out of quota, and 404
+for unknown links or disabled accounts. Raw WireGuard / JSON blocks are skipped.
+Users can create a new link from their page; the old one stops working immediately.
+Add rate limiting for `/api/sub/*` before heavy public use.

@@ -77,3 +77,9 @@ with check (auth.uid() = '88d549d1-2a8c-4604-bd14-6afa6a0b335f'::uuid);
 
 -- No anon/authenticated policies on vpn_users, vpn_user_sessions,
 -- or vpn_user_configs. Server-side service-role access bypasses RLS.
+
+-- Subscription link (for iPhone / third-party apps). One secret token per user.
+-- Safe to run more than once. Run just this block on an existing database.
+alter table public.vpn_users add column if not exists sub_token text;
+create unique index if not exists vpn_users_sub_token_idx
+  on public.vpn_users(sub_token) where sub_token is not null;

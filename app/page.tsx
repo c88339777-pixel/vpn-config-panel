@@ -25,8 +25,12 @@ import {
   Activity,
   Gauge,
   CalendarClock,
+  Smartphone,
+  RefreshCw,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
+
+const APP_DISPLAY_NAME = "Xylen VPN";
 
 type VpnConfig = {
   id: string | number;
@@ -66,6 +70,8 @@ export default function Home() {
   const [userFilter, setUserFilter] = useState("all");
   const [userConfigs, setUserConfigs] = useState<VpnConfig[]>([]);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [subUrl, setSubUrl] = useState("");
+  const [qrDataUrl, setQrDataUrl] = useState("");
 
   const [email, setEmail] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
@@ -189,6 +195,7 @@ export default function Home() {
         setUserMode(false);
         setUserConfigs([]);
         setSubscription(null);
+        setSubUrl("");
         return;
       }
 
@@ -196,12 +203,64 @@ export default function Home() {
       setLoggedInUsername(data.username || "");
       setUserConfigs(data.configs || []);
       setSubscription(data.subscription || null);
+      loadSubscriptionLink();
     } catch {
       setUserMode(false);
       setUserConfigs([]);
       setSubscription(null);
+      setSubUrl("");
     }
   }
+
+  async function loadSubscriptionLink(regenerate = false) {
+    try {
+      const response = await fetch("/api/user/subscription", {
+        method: regenerate ? "POST" : "GET",
+        cache: "no-store",
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok || !data.url) {
+        throw new Error(data.error || "خطا در دریافت لینک اشتراک");
+      }
+
+      setSubUrl(data.url);
+      if (regenerate) setMessage("لینک اشتراک جدید ساخته شد؛ لینک قبلی دیگر کار نمی‌کند");
+    } catch (error: any) {
+      if (regenerate) setMessage(error.message || "خطا در ساخت لینک جدید");
+    }
+  }
+
+  function regenerateSubscriptionLink() {
+    if (!window.confirm("با ساخت لینک جدید، لینک قبلی در همه‌ی دستگاه‌ها از کار می‌افتد و باید لینک جدید را دوباره در برنامه وارد کنید. ادامه می‌دهید؟")) {
+      return;
+    }
+    loadSubscriptionLink(true);
+  }
+
+  useEffect(() => {
+    if (!subUrl) {
+      setQrDataUrl("");
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const mod: any = await import("qrcode");
+        const toDataURL = mod.toDataURL || mod.default?.toDataURL;
+        const url = await toDataURL(subUrl, { margin: 1, width: 260 });
+        if (!cancelled) setQrDataUrl(url);
+      } catch {
+        if (!cancelled) setQrDataUrl("");
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [subUrl]);
 
   useEffect(() => {
     let mounted = true;
@@ -314,6 +373,7 @@ export default function Home() {
         setUserMode(false);
         setUserConfigs([]);
         setSubscription(null);
+        setSubUrl("");
         setLoggedInUsername("");
       }
 
@@ -791,7 +851,7 @@ export default function Home() {
           aria-live="polite"
         >
           {copyToast === "success" ? <CheckCircle2 size={21} /> : <AlertCircle size={21} />}
-          <span>{copyToast === "success" ? "کانفیگ با موفقیت کپی شد" : "کپی کانفیگ انجام نشد؛ دوباره تلاش کنید"}</span>
+          <span>{copyToast === "success" ? "با موفقیت کپی شد" : "کپی انجام نشد؛ دوباره تلاش کنید"}</span>
         </div>
       )}
       <div className="container">
@@ -966,6 +1026,74 @@ export default function Home() {
                     </article>
                   ))}
                 </div>
+              )}
+            </section>
+
+            <section className="panel user-subscription-link-panel">
+              <div className="section-heading-row">
+                <h2><Smartphone size={20} /> اتصال در آیفون و سایر برنامه‌ها</h2>
+              </div>
+              <p className="sub-help">
+                برنامه‌ی VPN را روی گوشی نصب کنید و با یکی از دکمه‌های زیر لینک اشتراک را به آن اضافه کنید.
+                بعد از آن، کانفیگ‌ها خودکار به‌روز می‌شوند.
+              </p>
+
+              {subUrl ? (
+                <>
+                  <div className="sub-link-box">
+                    <input type="text" readOnly dir="ltr" value={subUrl} aria-label="لینک اشتراک" onFocus={(event) => event.currentTarget.select()} />
+                    <button type="button" className="connect-config-button copy-config-button" onClick={() => copyConfig(subUrl)} aria-label="کپی لینک اشتراک">
+                      <Copy size={18} />
+                      کپی لینک
+                    </button>
+                  </div>
+
+                  <div className="sub-app-grid">
+                    {[
+                      { id: "streisand", name: "Streisand", href: `streisand://import/${subUrl}#${encodeURIComponent(APP_DISPLAY_NAME)}` },
+                      { id: "v2box", name: "V2Box", href: `v2box://install-sub?url=${encodeURIComponent(subUrl)}&name=${encodeURIComponent(APP_DISPLAY_NAME)}` },
+                      { id: "singbox", name: "sing-box", href: `sing-box://import-remote-profile?url=${encodeURIComponent(subUrl)}#${encodeURIComponent(APP_DISPLAY_NAME)}` },
+                      { id: "hiddify", name: "Hiddify", href: `hiddify://import/${subUrl}#${encodeURIComponent(APP_DISPLAY_NAME)}` },
+                      { id: "happ", name: "Happ", href: `happ://add/${subUrl}` },
+                    ].map((app) => (
+                      <a className="sub-app-button" key={app.id} href={app.href}>
+                        افزودن به {app.name}
+                      </a>
+                    ))}
+                    <button type="button" className="sub-app-button" onClick={() => copyConfig(subUrl)}>
+                      کپی لینک برای NPV Tunnel
+                    </button>
+                  </div>
+
+                  <p className="sub-npv-note">
+                    <strong>NPV Tunnel:</strong> این برنامه لینک افزودن مستقیم ندارد. لینک را کپی کنید و داخل برنامه در بخش افزودن اشتراک (Subscription) بچسبانید.
+                    اگر نسخه‌ی شما این گزینه را نداشت، هر کانفیگ را از «کانفیگ‌های من» جدا کپی کنید و از کلیپ‌بورد وارد برنامه کنید.{" "}
+                    <a href="https://apps.apple.com/app/npv-tunnel/id1629465476" target="_blank" rel="noopener noreferrer">نصب از App Store</a>
+                  </p>
+
+                  <ol className="sub-steps">
+                    <li>یکی از برنامه‌های بالا را از App Store نصب کنید.</li>
+                    <li>روی دکمه‌ی همان برنامه بزنید. اگر باز نشد، «کپی لینک» را بزنید و در بخش افزودن اشتراک (Subscription) برنامه بچسبانید.</li>
+                    <li>بعد از اضافه شدن، یکی از سرورها را انتخاب و وصل شوید.</li>
+                  </ol>
+
+                  {qrDataUrl && (
+                    <div className="sub-qr">
+                      <img src={qrDataUrl} alt="کد QR لینک اشتراک" width={180} height={180} />
+                      <span>اگر سایت را روی کامپیوتر باز کرده‌اید، این کد را با برنامه اسکن کنید.</span>
+                    </div>
+                  )}
+
+                  <p className="sub-warning">
+                    این لینک مثل رمز عبور شماست؛ آن را برای کسی نفرستید. اگر لو رفت، لینک جدید بسازید.
+                  </p>
+                  <button type="button" onClick={regenerateSubscriptionLink} disabled={loading}>
+                    <RefreshCw size={18} />
+                    ساخت لینک جدید
+                  </button>
+                </>
+              ) : (
+                <p className="message">در حال آماده‌سازی لینک اشتراک...</p>
               )}
             </section>
 

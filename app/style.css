@@ -1009,3 +1009,118 @@ button svg {
 @media (prefers-reduced-motion: reduce) {
   .copy-toast { animation: none; opacity: 1; transform: translate(50%, 0); }
 }
+
+/* لینک اشتراک (آیفون و برنامه‌های دیگر) */
+.user-subscription-link-panel {
+  margin-bottom: 0;
+}
+
+.sub-help,
+.sub-warning {
+  color: #9fb5cb;
+  font-size: 13px;
+  line-height: 1.9;
+}
+
+.sub-warning {
+  margin: 14px 0 10px;
+  color: #fbbf24;
+}
+
+.sub-link-box {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  margin: 12px 0;
+}
+
+.sub-link-box input {
+  margin: 0;
+  font-size: 12px;
+}
+
+.sub-link-box .copy-config-button {
+  width: auto;
+  white-space: nowrap;
+}
+
+.sub-app-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.sub-app-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 10px;
+  border: 1px solid #2b405c;
+  border-radius: 14px;
+  background: linear-gradient(145deg, #172438, #0e1726);
+  color: #7dd3fc;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  text-decoration: none;
+  transition: border-color .2s ease, transform .2s ease;
+}
+
+.sub-app-button:hover {
+  border-color: #168bd0;
+  transform: translateY(-2px);
+}
+
+.sub-steps {
+  margin: 12px 0;
+  padding: 0 20px 0 0;
+  color: #cbd5e1;
+  font-size: 13px;
+  line-height: 2;
+}
+
+.sub-qr {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 14px 0;
+  color: #9fb5cb;
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.sub-qr img {
+  flex: 0 0 auto;
+  border-radius: 12px;
+  background: #fff;
+  padding: 6px;
+}
+
+@media (max-width: 600px) {
+  .sub-link-box { grid-template-columns: 1fr; }
+  .sub-link-box .copy-config-button { width: 100%; }
+  .sub-qr { flex-direction: column; align-items: flex-start; }
+}
+
+button.sub-app-button {
+  width: auto;
+  margin: 0;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.sub-npv-note {
+  margin: 12px 0;
+  padding: 12px 14px;
+  border: 1px dashed #2b405c;
+  border-radius: 14px;
+  color: #9fb5cb;
+  font-size: 12.5px;
+  line-height: 1.9;
+}
+
+.sub-npv-note a {
+  color: #7dd3fc;
+}

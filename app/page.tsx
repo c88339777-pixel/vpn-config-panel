@@ -60,6 +60,18 @@ type Subscription = {
   remaining_gb: number | null;
 };
 
+function buildAppLinks(url: string) {
+  const name = encodeURIComponent(APP_DISPLAY_NAME);
+
+  return [
+    { id: "streisand", name: "Streisand", href: `streisand://import/${url}#${name}` },
+    { id: "v2box", name: "V2Box", href: `v2box://install-sub?url=${encodeURIComponent(url)}&name=${name}` },
+    { id: "singbox", name: "sing-box", href: `sing-box://import-remote-profile?url=${encodeURIComponent(url)}#${name}` },
+    { id: "hiddify", name: "Hiddify", href: `hiddify://import/${url}#${name}` },
+    { id: "happ", name: "Happ", href: `happ://add/${url}` },
+  ];
+}
+
 export default function Home() {
   const [session, setSession] = useState<any>(null);
   const [authReady, setAuthReady] = useState(false);
@@ -1035,7 +1047,8 @@ export default function Home() {
               </div>
               <p className="sub-help">
                 برنامه‌ی VPN را روی گوشی نصب کنید و با یکی از دکمه‌های زیر لینک اشتراک را به آن اضافه کنید.
-                بعد از آن، کانفیگ‌ها خودکار به‌روز می‌شوند.
+                این لینک شامل کانفیگ‌های حساب شما و سرورهای رایگان عمومی است، همان‌هایی که در برنامه‌ی اندروید هم می‌گیرید؛
+                بعد از افزودن، کانفیگ‌ها خودکار به‌روز می‌شوند. در برنامه «تست تأخیر» را بزنید و سرورهای سریع را انتخاب کنید.
               </p>
 
               {subUrl ? (
@@ -1049,13 +1062,7 @@ export default function Home() {
                   </div>
 
                   <div className="sub-app-grid">
-                    {[
-                      { id: "streisand", name: "Streisand", href: `streisand://import/${subUrl}#${encodeURIComponent(APP_DISPLAY_NAME)}` },
-                      { id: "v2box", name: "V2Box", href: `v2box://install-sub?url=${encodeURIComponent(subUrl)}&name=${encodeURIComponent(APP_DISPLAY_NAME)}` },
-                      { id: "singbox", name: "sing-box", href: `sing-box://import-remote-profile?url=${encodeURIComponent(subUrl)}#${encodeURIComponent(APP_DISPLAY_NAME)}` },
-                      { id: "hiddify", name: "Hiddify", href: `hiddify://import/${subUrl}#${encodeURIComponent(APP_DISPLAY_NAME)}` },
-                      { id: "happ", name: "Happ", href: `happ://add/${subUrl}` },
-                    ].map((app) => (
+                    {buildAppLinks(subUrl).map((app) => (
                       <a className="sub-app-button" key={app.id} href={app.href}>
                         افزودن به {app.name}
                       </a>
@@ -1086,6 +1093,7 @@ export default function Home() {
 
                   <p className="sub-warning">
                     این لینک مثل رمز عبور شماست؛ آن را برای کسی نفرستید. اگر لو رفت، لینک جدید بسازید.
+                    سرورهای رایگان را افراد ناشناس راه‌اندازی کرده‌اند و صاحب سرور می‌تواند ترافیک را ببیند؛ برای بانک و حساب‌های شخصی از آن‌ها استفاده نکنید.
                   </p>
                   <button type="button" onClick={regenerateSubscriptionLink} disabled={loading}>
                     <RefreshCw size={18} />

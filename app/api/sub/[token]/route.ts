@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminSupabase } from "@/lib/server-supabase";
 import { SUB_PROFILE_TITLE, SUB_TOKEN_PATTERN } from "@/lib/subscription";
+import { getFreeLinks } from "@/lib/free-servers";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 30;
 
 const GB = 1024 * 1024 * 1024;
 
@@ -86,6 +88,15 @@ export async function GET(
           if (URI_CONFIG.test(line) && !lines.includes(line)) lines.push(line);
         }
       }
+    }
+
+    // The same free public servers the Android app collects, listed after the user's own configs.
+    try {
+      for (const link of await getFreeLinks()) {
+        if (!lines.includes(link)) lines.push(link);
+      }
+    } catch (freeError) {
+      console.error("Free servers could not be added:", freeError);
     }
 
     const body = Buffer.from(lines.join("\n"), "utf8").toString("base64");
